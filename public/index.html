@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mochi Bird</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div class="background-orb orb-a"></div>
+    <div class="background-orb orb-b"></div>
+    <main class="app-shell">
+      <section class="hero">
+        <div class="eyebrow">Discord launch game</div>
+        <h1>Mochi Bird</h1>
+        <p>
+          A browser-first Mochi Bird that opens from Discord, records your score, and keeps a
+          leaderboard.
+        </p>
+      </section>
+
+      <div class="content-grid">
+        <section class="game-card">
+          <div class="hud">
+            <div class="stat">
+              <span>Score</span>
+              <strong id="score">0</strong>
+            </div>
+            <div class="stat">
+              <span>Best</span>
+              <strong id="bestScore">0</strong>
+            </div>
+            <div class="status" id="status">Loading session...</div>
+          </div>
+
+          <div class="stage">
+            <canvas id="game"></canvas>
+            <div class="overlay" id="overlay">
+              <div class="overlay-card">
+                <h2 id="overlayTitle">Preparing game</h2>
+                <p id="overlayText">Loading session data.</p>
+                <button id="primaryButton" type="button">Start</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p>Flap with Space, click, or tap. Opened from Discord? Your score will be recorded automatically.</p>
+            <p id="sessionNote">Practice mode is available when you open this page directly.</p>
+          </div>
+        </section>
+
+        <aside class="leaderboard-card">
+          <div class="panel-header">
+            <div>
+              <div class="panel-kicker">Leaderboard</div>
+              <h2>Top Mochi runs</h2>
+            </div>
+            <button id="refreshLeaderboard" class="ghost-button" type="button">Refresh</button>
+          </div>
+
+          <p class="leaderboard-status" id="leaderboardStatus">Loading leaderboard...</p>
+          <ol class="leaderboard-list" id="leaderboardList"></ol>
+        </aside>
+      </div>
+    </main>
+
+    <script type="module" src="/game.js"></script>
+  </body>
+</html>
