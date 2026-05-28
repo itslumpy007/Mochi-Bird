@@ -4,67 +4,127 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Mochi Bird</title>
-    <link rel="stylesheet" href="/style.css" />
+    <link rel="stylesheet" href="./style.css?v=outfits2" />
   </head>
   <body>
     <div class="background-orb orb-a"></div>
     <div class="background-orb orb-b"></div>
+
     <main class="app-shell">
       <section class="hero">
         <div class="eyebrow">Discord launch game</div>
         <h1>Mochi Bird</h1>
         <p>
-          A browser-first Mochi Bird that opens from Discord, records your score, and keeps a
-          leaderboard.
+          Tap to flap, dodge pipes, and collect cans. Your score saves when the run ends.
         </p>
       </section>
 
       <div class="content-grid">
         <section class="game-card">
-          <div class="hud">
-            <div class="stat">
-              <span>Score</span>
-              <strong id="score">0</strong>
-            </div>
-            <div class="stat">
-              <span>Best</span>
-              <strong id="bestScore">0</strong>
-            </div>
-            <div class="status" id="status">Loading session...</div>
+        <div class="hud">
+          <div class="stat">
+            <span>Score</span>
+            <strong id="score">0</strong>
           </div>
+          <div class="stat">
+            <span>Best</span>
+            <strong id="bestScore">0</strong>
+          </div>
+          <div class="stat">
+            <span>Cans</span>
+            <strong id="canCount">0</strong>
+          </div>
+          <div class="status" id="status">Loading...</div>
+        </div>
 
-          <div class="stage">
+          <div class="stage" id="stage">
             <canvas id="game"></canvas>
-            <div class="overlay" id="overlay">
+            <div class="overlay" id="overlay" aria-live="polite">
               <div class="overlay-card">
-                <h2 id="overlayTitle">Preparing game</h2>
-                <p id="overlayText">Loading session data.</p>
-                <button id="primaryButton" type="button">Start</button>
+                <h2 id="overlayTitle">Ready to play</h2>
+                <p id="overlayText">
+                  Tap anywhere, click, or press Space to start.
+                </p>
+                <div class="overlay-summary" id="overlaySummary"></div>
+                <button id="primaryButton" type="button">Play</button>
               </div>
             </div>
           </div>
 
           <div class="footer">
-            <p>Flap with Space, click, or tap. Opened from Discord? Your score will be recorded automatically.</p>
+            <p>Opened from Discord? Your score will be recorded automatically.</p>
             <p id="sessionNote">Practice mode is available when you open this page directly.</p>
+            <button id="soundToggle" type="button" class="ghost-button">Sound: On</button>
+            <button id="wardrobeButton" type="button" class="ghost-button">Wardrobe</button>
           </div>
         </section>
 
-        <aside class="leaderboard-card">
-          <div class="panel-header">
+        <aside class="leaderboard-card" aria-label="Leaderboard">
+          <div class="leaderboard-head">
             <div>
-              <div class="panel-kicker">Leaderboard</div>
-              <h2>Top Mochi runs</h2>
+              <div class="eyebrow">Discord runs</div>
+              <h2>Leaderboard</h2>
             </div>
-            <button id="refreshLeaderboard" class="ghost-button" type="button">Refresh</button>
+            <div class="leaderboard-meta" id="leaderboardUpdated">Last updated just now</div>
           </div>
 
-          <p class="leaderboard-status" id="leaderboardStatus">Loading leaderboard...</p>
+          <div class="leaderboard-status" id="leaderboardStatus">Loading top scores...</div>
           <ol class="leaderboard-list" id="leaderboardList"></ol>
+          <div class="leaderboard-empty hidden" id="leaderboardEmpty">No scores yet. Be the first one in.</div>
+
+          <div class="leaderboard-subsection">
+            <div class="leaderboard-subhead">
+              <span>Recent runs</span>
+              <span class="leaderboard-submeta" id="recentRunsUpdated">Last updated just now</span>
+            </div>
+            <ol class="leaderboard-list leaderboard-list--recent" id="recentRunsList"></ol>
+            <div class="leaderboard-empty hidden" id="recentRunsEmpty">No recent runs yet.</div>
+          </div>
         </aside>
       </div>
     </main>
 
-    <script type="module" src="/game.js"></script>
+    <div class="wardrobe-modal hidden" id="wardrobeModal" aria-hidden="true">
+      <div class="wardrobe-backdrop" id="wardrobeBackdrop"></div>
+      <section class="wardrobe-sheet" role="dialog" aria-modal="true" aria-labelledby="wardrobeTitle">
+        <div class="wardrobe-head">
+          <div>
+            <div class="eyebrow">Cosmetic outfits</div>
+            <h2 id="wardrobeTitle">Wardrobe</h2>
+            <p class="wardrobe-copy">
+              Spend Dr. Pepper cans to unlock outfits, hair, and special skins.
+            </p>
+          </div>
+          <div class="wardrobe-wallet">
+            <span>Cans</span>
+            <strong id="wardrobeWallet">0</strong>
+          </div>
+        </div>
+
+        <div class="wardrobe-info">
+          <div class="wardrobe-pill">
+            <span>Equipped</span>
+            <strong id="wardrobeSelected">Default Avatar</strong>
+          </div>
+          <div class="wardrobe-pill">
+            <span>Owned</span>
+            <strong id="wardrobeOwned">1</strong>
+          </div>
+          <div class="wardrobe-pill">
+            <span>Tip</span>
+            <strong id="wardrobeStatus">Tap an outfit to buy or equip.</strong>
+          </div>
+        </div>
+
+        <div class="wardrobe-grid" id="wardrobeGrid" aria-live="polite"></div>
+
+        <div class="wardrobe-actions">
+          <button id="wardrobeCloseButton" type="button" class="ghost-button">Close</button>
+        </div>
+      </section>
+    </div>
+
+    <script id="mochi-bootstrap" type="application/json">{}</script>
+    <script type="module" src="./game.js?v=outfits2"></script>
   </body>
 </html>
