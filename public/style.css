@@ -312,7 +312,7 @@ canvas {
   place-items: center;
   background: linear-gradient(180deg, rgba(7, 16, 24, 0.06), rgba(7, 16, 24, 0.42));
   transition: opacity 0.2s ease, transform 0.2s ease;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .overlay.hidden {
