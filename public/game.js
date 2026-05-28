@@ -1958,10 +1958,7 @@ window.addEventListener('keydown', (event) => {
 });
 
 stageEl.addEventListener('pointerdown', onPrimaryInput);
-overlayEl.addEventListener('pointerdown', onPrimaryInput);
-overlayEl.addEventListener('click', onPrimaryInput);
 primaryButton.addEventListener('pointerdown', onPrimaryInput);
-primaryButton.addEventListener('click', onPrimaryInput);
 soundToggleEl.addEventListener('click', toggleSound);
 wardrobeButtonEl?.addEventListener('click', openWardrobe);
 wardrobeCloseButtonEl?.addEventListener('click', closeWardrobe);
