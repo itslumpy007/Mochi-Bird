@@ -79,26 +79,6 @@ export async function startBot({
     }
 
     if (interaction.commandName === 'mochi' || interaction.commandName === 'flappy') {
-      if (activityMode) {
-        const response = await fetch(
-          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              type: 12
-            })
-          }
-        );
-
-        if (!response.ok) {
-          throw new Error(`Failed to launch activity: ${response.status}`);
-        }
-        return;
-      }
-
       const session = createSession({
         userId: interaction.user.id,
         userTag: interaction.user.tag,
@@ -110,7 +90,11 @@ export async function startBot({
       const playUrl = buildPlayUrl(baseUrl, session.id);
       const embed = new EmbedBuilder()
         .setTitle('Mochi Bird')
-        .setDescription('Your run is ready. Tap the button to open the game in a browser.')
+        .setDescription(
+          activityMode
+            ? 'Your run is ready. Tap the button to open the game. If Activity launch is finicky, this link still works on mobile and PC.'
+            : 'Your run is ready. Tap the button to open the game in a browser.'
+        )
         .addFields(
           { name: 'Player', value: interaction.user.tag, inline: true },
           { name: 'Session', value: session.id.slice(0, 8), inline: true }
