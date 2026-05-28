@@ -9,6 +9,7 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitleEl = document.getElementById('overlayTitle');
 const overlayTextEl = document.getElementById('overlayText');
 const sessionNoteEl = document.getElementById('sessionNote');
+const debugNoteEl = document.getElementById('debugNote');
 const stageEl = document.getElementById('stage');
 const overlaySummaryEl = document.getElementById('overlaySummary');
 const primaryButton = document.getElementById('primaryButton');
@@ -74,6 +75,23 @@ let discordBootstrapPromise = null;
 if (activityMode && !sessionId) {
   sessionNoteEl.textContent = 'Connecting to Discord...';
 }
+
+function updateDebugNote() {
+  if (!debugNoteEl) {
+    return;
+  }
+
+  const modeLabel = activityMode ? 'Activity' : 'Browser';
+  const sessionLabel = sessionId
+    ? `connected (${session?.userTag || 'pending'})`
+    : activityMode
+      ? `bootstrap ${activityBootstrapState}`
+      : 'none';
+  const saveLabel = sessionId ? 'shared' : 'local';
+  debugNoteEl.textContent = `Mode: ${modeLabel} | Session: ${sessionLabel} | Save path: ${saveLabel}`;
+}
+
+updateDebugNote();
 
 const birdSprite = new Image();
 const assetVersion = 'outfits1';
@@ -529,6 +547,7 @@ async function bootstrapDiscordActivitySession() {
     activityBootstrapState = 'error';
     sessionNoteEl.textContent = getSessionNoteText();
     updateStatus('Discord client id missing');
+    updateDebugNote();
     return false;
   }
 
@@ -536,6 +555,7 @@ async function bootstrapDiscordActivitySession() {
     activityBootstrapState = 'connecting';
     sessionNoteEl.textContent = getSessionNoteText();
     updateStatus('Connecting to Discord...');
+    updateDebugNote();
 
     const discordSdk = new DiscordSDK(discordClientId);
     await discordSdk.ready();
@@ -588,6 +608,7 @@ async function bootstrapDiscordActivitySession() {
     activityBootstrapState = 'ready';
     sessionNoteEl.textContent = getSessionNoteText();
     updateStatus(`Ready for ${session.userTag}`);
+    updateDebugNote();
     profileSyncReady = true;
     return true;
   })();
@@ -598,6 +619,7 @@ async function bootstrapDiscordActivitySession() {
     activityBootstrapState = 'error';
     sessionNoteEl.textContent = getSessionNoteText();
     updateStatus(`Discord bootstrap failed: ${error.message}`);
+    updateDebugNote();
     return false;
   } finally {
     discordBootstrapPromise = null;
@@ -1766,6 +1788,7 @@ async function loadSession() {
       : 'Practice mode: this run is local only.';
     hydrateBestScore();
     switchCosmeticProfile(getCosmeticStorageKey(), false);
+    updateDebugNote();
     return;
   }
 
@@ -1805,6 +1828,7 @@ async function loadSession() {
       || localProfile.cosmeticState.selectedId !== defaultCosmetic.id;
 
     profileSyncReady = true;
+    updateDebugNote();
 
     if (hasServerProgress) {
       applySharedProfile(serverProfile);
@@ -1836,6 +1860,7 @@ async function loadSession() {
     isPracticeMode = true;
     profileSyncReady = false;
     switchCosmeticProfile(getCosmeticStorageKey(), false);
+    updateDebugNote();
   }
 
   void loadLeaderboard({ quiet: true });

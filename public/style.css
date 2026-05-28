@@ -407,6 +407,14 @@ canvas {
   max-width: 54ch;
 }
 
+.debug-note {
+  width: 100%;
+  margin-top: -2px;
+  color: rgba(201, 240, 255, 0.82);
+  font-size: 0.84rem;
+  letter-spacing: 0.04em;
+}
+
 .ghost-button {
   appearance: none;
   border: 1px solid rgba(255, 255, 255, 0.12);
