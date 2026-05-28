@@ -42,15 +42,16 @@ if (bootstrapEl?.textContent) {
   }
 }
 
-const activityMode = Boolean(bootstrapPayload?.activityMode);
 const discordClientId = typeof bootstrapPayload?.discordClientId === 'string'
   ? bootstrapPayload.discordClientId.trim()
   : '';
 
 const params = new URLSearchParams(window.location.search);
+const likelyDiscordFrame = params.has('frame_id') || params.has('instance_id') || params.has('platform');
 let sessionId = params.get('sid');
 let isPracticeMode = !sessionId;
 let session = null;
+const activityMode = Boolean(bootstrapPayload?.activityMode || likelyDiscordFrame);
 let activityBootstrapState = sessionId ? 'ready' : (activityMode ? 'pending' : 'idle');
 let bestScoreKey = 'discord-mochi-bird-best-practice';
 let canWalletKey = 'discord-mochi-bird-can-wallet-practice';
@@ -1334,9 +1335,11 @@ function pipeBoxes(pipe) {
 
 function drawSky() {
   const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
-  skyGradient.addColorStop(0, '#78cffd');
-  skyGradient.addColorStop(0.6, '#beeefe');
-  skyGradient.addColorStop(1, '#ffe28a');
+  skyGradient.addColorStop(0, '#5bbef5');
+  skyGradient.addColorStop(0.45, '#89d8fb');
+  skyGradient.addColorStop(0.75, '#c2edff');
+  skyGradient.addColorStop(0.9, '#f5dea0');
+  skyGradient.addColorStop(1, '#f0c96a');
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, width, height);
 }
