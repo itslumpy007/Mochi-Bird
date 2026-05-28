@@ -48,10 +48,12 @@ const discordClientId = typeof bootstrapPayload?.discordClientId === 'string'
 
 const params = new URLSearchParams(window.location.search);
 const likelyDiscordFrame = params.has('frame_id') || params.has('instance_id') || params.has('platform');
+const likelyDiscordReferrer = typeof document.referrer === 'string'
+  && /discord(?:app)?\.com|ptb\.discord\.com|canary\.discord\.com/i.test(document.referrer);
 let sessionId = params.get('sid');
 let isPracticeMode = !sessionId;
 let session = null;
-const activityMode = Boolean(bootstrapPayload?.activityMode || likelyDiscordFrame);
+const activityMode = Boolean(bootstrapPayload?.activityMode || likelyDiscordFrame || likelyDiscordReferrer);
 let activityBootstrapState = sessionId ? 'ready' : (activityMode ? 'pending' : 'idle');
 let bestScoreKey = 'discord-mochi-bird-best-practice';
 let canWalletKey = 'discord-mochi-bird-can-wallet-practice';
