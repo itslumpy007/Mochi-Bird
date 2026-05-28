@@ -462,6 +462,9 @@ function getModeStatusLabel() {
     return 'Session';
   }
   if (activityMode) {
+    if (activityBootstrapState === 'pending' || activityBootstrapState === 'connecting') {
+      return 'Connecting to Discord';
+    }
     if (activityBootstrapState === 'ready') {
       return 'Session';
     }
@@ -1505,9 +1508,18 @@ function resetRun() {
   shakePower = 0;
   resetBoard();
   overlaySummaryEl.replaceChildren();
-  showOverlay('Ready to play', 'Tap anywhere, click, or press Space to start.');
+  showOverlay(
+    'Ready to play',
+    activityMode && !sessionId
+      ? 'Connecting to Discord...'
+      : 'Tap anywhere, click, or press Space to start.'
+  );
   primaryButton.textContent = 'Play';
-  updateStatus(getModeStatusLabel() === 'Practice mode' ? 'Practice mode ready' : 'Ready to play');
+  updateStatus(getModeStatusLabel() === 'Practice mode'
+    ? 'Practice mode ready'
+    : activityMode && !sessionId
+      ? 'Connecting to Discord...'
+      : 'Ready to play');
 }
 
 function startRun() {
@@ -1853,6 +1865,15 @@ async function onPrimaryInput(event) {
     event.stopPropagation();
   }
   void unlockAudio();
+
+  if (activityMode && !sessionId) {
+    updateStatus('Connecting to Discord...');
+    const ready = await bootstrapDiscordActivitySession();
+    if (!ready || !sessionId) {
+      return;
+    }
+  }
+
   flap();
 }
 
