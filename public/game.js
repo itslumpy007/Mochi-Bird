@@ -54,15 +54,29 @@ let overlayMode = 'start';
 const sprite = new Image();
 sprite.src   = '/assets/avatar.png';
 
+// ── Layout mode (desktop vs mobile/activity) ───────────────────────────────────
+function applyLayout() {
+  const wide = window.innerWidth >= 700;
+  document.body.classList.toggle('desktop', wide);
+  document.body.classList.toggle('mobile',  !wide);
+}
+
 // ── Canvas sizing ──────────────────────────────────────────────────────────────
 function resize() {
-  const rect = canvas.getBoundingClientRect();
-  W   = Math.max(1, rect.width);
-  H   = Math.max(1, rect.height);
-  DPR = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width  = Math.floor(W * DPR);
-  canvas.height = Math.floor(H * DPR);
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  applyLayout();
+  // Wait one tick so CSS has applied before reading canvas size
+  requestAnimationFrame(() => {
+    const rect = canvas.getBoundingClientRect();
+    W   = Math.max(1, rect.width);
+    H   = Math.max(1, rect.height);
+    DPR = Math.max(1, window.devicePixelRatio || 1);
+    canvas.width  = Math.floor(W * DPR);
+    canvas.height = Math.floor(H * DPR);
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // Reposition bird after resize
+    bird.x = W * 0.28;
+    bird.y = H * 0.42;
+  });
 }
 
 // ── Reset game state ───────────────────────────────────────────────────────────
@@ -274,7 +288,7 @@ stageEl.addEventListener('touchstart',  (e) => { e.preventDefault(); flap(); }, 
 
 refreshBtn.addEventListener('click', () => fetchLeaderboard(true));
 
-window.addEventListener('resize', () => { resize(); resetGame(); });
+window.addEventListener('resize', () => { applyLayout(); resize(); resetGame(); });
 
 // ── Physics ────────────────────────────────────────────────────────────────────
 function addPipe() {
@@ -538,6 +552,7 @@ function loop(ts) {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
-resize();
-requestAnimationFrame(loop);   // loop starts immediately — bird is already valid
-loadSession();                 // session loads async, updates overlay & status
+applyLayout();                 // set desktop/mobile class immediately
+resize();                      // size the canvas (async tick inside)
+requestAnimationFrame(loop);   // start render loop — bird is always a valid object
+loadSession();                 // load session & show the right overlay
