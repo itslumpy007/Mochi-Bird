@@ -553,32 +553,32 @@ function drawBird() {
   ctx.translate(bird.x, bird.y);
   ctx.rotate(tilt);
 
+  ctx.fillStyle = '#ffd84d';
+  ctx.beginPath();
+  ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#ffb31f';
+  ctx.beginPath();
+  ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#1a2230';
+  ctx.beginPath();
+  ctx.arc(5, -4, 2.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#f27d2f';
+  ctx.beginPath();
+  ctx.moveTo(11, -1);
+  ctx.lineTo(20, 3);
+  ctx.lineTo(11, 7);
+  ctx.closePath();
+  ctx.fill();
+
   if (birdSprite.complete && birdSprite.naturalWidth > 0) {
     const size = bird.radius * 2.35;
     ctx.drawImage(birdSprite, -size / 2, -size / 2, size, size);
-  } else {
-    ctx.fillStyle = '#ffd84d';
-    ctx.beginPath();
-    ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#ffb31f';
-    ctx.beginPath();
-    ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#1a2230';
-    ctx.beginPath();
-    ctx.arc(5, -4, 2.1, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#f27d2f';
-    ctx.beginPath();
-    ctx.moveTo(11, -1);
-    ctx.lineTo(20, 3);
-    ctx.lineTo(11, 7);
-    ctx.closePath();
-    ctx.fill();
   }
 
   ctx.restore();
