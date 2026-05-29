@@ -64,19 +64,16 @@ function applyLayout() {
 // ── Canvas sizing ──────────────────────────────────────────────────────────────
 function resize() {
   applyLayout();
-  // Wait one tick so CSS has applied before reading canvas size
-  requestAnimationFrame(() => {
-    const rect = canvas.getBoundingClientRect();
-    W   = Math.max(1, rect.width);
-    H   = Math.max(1, rect.height);
-    DPR = Math.max(1, window.devicePixelRatio || 1);
-    canvas.width  = Math.floor(W * DPR);
-    canvas.height = Math.floor(H * DPR);
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    // Reposition bird after resize
-    bird.x = W * 0.28;
-    bird.y = H * 0.42;
-  });
+  const rect = canvas.getBoundingClientRect();
+  W   = Math.max(1, rect.width);
+  H   = Math.max(1, rect.height);
+  DPR = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  // Reposition bird after resize
+  bird.x = W * 0.28;
+  bird.y = H * 0.42;
 }
 
 // ── Reset game state ───────────────────────────────────────────────────────────
