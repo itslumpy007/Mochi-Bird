@@ -11,7 +11,7 @@ import {
   SlashCommandBuilder
 } from 'discord.js';
 import { buildPlayUrl, createSession } from './state.js';
-import { getLeaderboard, getRecentRuns } from './leaderboard.js';
+import { getLeaderboard } from './leaderboard.js';
 
 function formatLeaderboard(entries) {
   if (!entries.length) {
@@ -20,16 +20,6 @@ function formatLeaderboard(entries) {
 
   return entries
     .map((entry, index) => `${index + 1}. ${entry.userTag} - ${entry.bestScore}`)
-    .join('\n');
-}
-
-function formatRecentRuns(entries) {
-  if (!entries.length) {
-    return 'No recent runs yet.';
-  }
-
-  return entries
-    .map((entry, index) => `${index + 1}. ${entry.userTag} - ${entry.score}`)
     .join('\n');
 }
 
@@ -43,9 +33,6 @@ export async function registerCommands({ token, clientId, guildId }) {
       .setDescription('Start a Mochi Bird run in your browser.'),
     new SlashCommandBuilder()
       .setName('leaderboard')
-      .setDescription('Show the Mochi Bird leaderboard.'),
-    new SlashCommandBuilder()
-      .setName('mochi-leaderboard')
       .setDescription('Show the Mochi Bird leaderboard.')
   ].map((command) => command.toJSON());
 
@@ -132,16 +119,14 @@ export async function startBot({
       return;
     }
 
-    if (interaction.commandName === 'leaderboard' || interaction.commandName === 'mochi-leaderboard') {
+    if (interaction.commandName === 'leaderboard') {
       const entries = await getLeaderboard(10);
-      const recentRuns = await getRecentRuns(5);
       await interaction.reply({
         ephemeral: true,
         embeds: [
           new EmbedBuilder()
             .setTitle('Mochi Bird Leaderboard')
             .setDescription(formatLeaderboard(entries))
-            .addFields({ name: 'Recent runs', value: formatRecentRuns(recentRuns) })
             .setColor(0xffc857)
         ]
       });
