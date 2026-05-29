@@ -108,6 +108,9 @@ function resetGame() {
   scoreEl.textContent = '0';
   bestScore = Number(localStorage.getItem(bestScoreKey) || 0);
   bestScoreEl.textContent = String(bestScore);
+
+  // Reset button to ready state
+  startBtn.disabled = false;
 }
 
 // ── Overlay helpers ────────────────────────────────────────────────────────────
