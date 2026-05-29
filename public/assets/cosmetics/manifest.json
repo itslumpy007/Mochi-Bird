@@ -1,0 +1,632 @@
+﻿[
+    {
+        "id":  "shalani-energy-01",
+        "file":  "shalani-energy-01.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  257,
+        "y":  35,
+        "width":  273,
+        "height":  403
+    },
+    {
+        "id":  "shalani-energy-02",
+        "file":  "shalani-energy-02.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  611,
+        "y":  35,
+        "width":  264,
+        "height":  402
+    },
+    {
+        "id":  "shalani-energy-03",
+        "file":  "shalani-energy-03.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  951,
+        "y":  35,
+        "width":  271,
+        "height":  402
+    },
+    {
+        "id":  "shalani-energy-04",
+        "file":  "shalani-energy-04.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  29,
+        "y":  528,
+        "width":  260,
+        "height":  393
+    },
+    {
+        "id":  "shalani-energy-05",
+        "file":  "shalani-energy-05.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  332,
+        "y":  529,
+        "width":  246,
+        "height":  391
+    },
+    {
+        "id":  "shalani-energy-06",
+        "file":  "shalani-energy-06.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  625,
+        "y":  530,
+        "width":  247,
+        "height":  395
+    },
+    {
+        "id":  "shalani-energy-07",
+        "file":  "shalani-energy-07.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  1225,
+        "y":  530,
+        "width":  251,
+        "height":  395
+    },
+    {
+        "id":  "shalani-energy-08",
+        "file":  "shalani-energy-08.png",
+        "source":  "E2A859D4-2187-4157-827D-73ECA697C32C.png",
+        "x":  924,
+        "y":  531,
+        "width":  248,
+        "height":  390
+    },
+    {
+        "id":  "dr-shelly-01",
+        "file":  "dr-shelly-01.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  29,
+        "y":  24,
+        "width":  253,
+        "height":  420
+    },
+    {
+        "id":  "dr-shelly-02",
+        "file":  "dr-shelly-02.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  329,
+        "y":  25,
+        "width":  253,
+        "height":  418
+    },
+    {
+        "id":  "dr-shelly-03",
+        "file":  "dr-shelly-03.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  920,
+        "y":  25,
+        "width":  256,
+        "height":  422
+    },
+    {
+        "id":  "dr-shelly-04",
+        "file":  "dr-shelly-04.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  1224,
+        "y":  25,
+        "width":  255,
+        "height":  420
+    },
+    {
+        "id":  "dr-shelly-05",
+        "file":  "dr-shelly-05.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  617,
+        "y":  26,
+        "width":  258,
+        "height":  419
+    },
+    {
+        "id":  "dr-shelly-06",
+        "file":  "dr-shelly-06.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  325,
+        "y":  541,
+        "width":  248,
+        "height":  402
+    },
+    {
+        "id":  "dr-shelly-07",
+        "file":  "dr-shelly-07.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  627,
+        "y":  541,
+        "width":  243,
+        "height":  405
+    },
+    {
+        "id":  "dr-shelly-08",
+        "file":  "dr-shelly-08.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  921,
+        "y":  541,
+        "width":  249,
+        "height":  405
+    },
+    {
+        "id":  "dr-shelly-09",
+        "file":  "dr-shelly-09.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  1226,
+        "y":  541,
+        "width":  250,
+        "height":  406
+    },
+    {
+        "id":  "dr-shelly-10",
+        "file":  "dr-shelly-10.png",
+        "source":  "E2C64E2D-5F53-4C91-A34A-2879FB750F77.png",
+        "x":  30,
+        "y":  542,
+        "width":  252,
+        "height":  402
+    },
+    {
+        "id":  "sussballs-01",
+        "file":  "sussballs-01.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  35,
+        "y":  206,
+        "width":  317,
+        "height":  337
+    },
+    {
+        "id":  "sussballs-02",
+        "file":  "sussballs-02.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  1022,
+        "y":  206,
+        "width":  316,
+        "height":  338
+    },
+    {
+        "id":  "sussballs-03",
+        "file":  "sussballs-03.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  697,
+        "y":  207,
+        "width":  309,
+        "height":  336
+    },
+    {
+        "id":  "sussballs-04",
+        "file":  "sussballs-04.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  369,
+        "y":  208,
+        "width":  310,
+        "height":  335
+    },
+    {
+        "id":  "sussballs-05",
+        "file":  "sussballs-05.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  181,
+        "y":  597,
+        "width":  306,
+        "height":  336
+    },
+    {
+        "id":  "sussballs-06",
+        "file":  "sussballs-06.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  535,
+        "y":  597,
+        "width":  304,
+        "height":  336
+    },
+    {
+        "id":  "sussballs-07",
+        "file":  "sussballs-07.png",
+        "source":  "E597971E-66D4-41E6-8391-2D670EF8DB8A.png",
+        "x":  881,
+        "y":  597,
+        "width":  304,
+        "height":  337
+    },
+    {
+        "id":  "watermelon-01",
+        "file":  "watermelon-01.png",
+        "source":  "BDE2671A-6CD1-44B4-A9BE-61057535FE27.png",
+        "x":  190,
+        "y":  171,
+        "width":  673,
+        "height":  1087
+    },
+    {
+        "id":  "dr-shelly-set-2-01",
+        "file":  "dr-shelly-set-2-01.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  799,
+        "y":  31,
+        "width":  250,
+        "height":  375
+    },
+    {
+        "id":  "dr-shelly-set-2-02",
+        "file":  "dr-shelly-set-2-02.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  284,
+        "y":  40,
+        "width":  236,
+        "height":  374
+    },
+    {
+        "id":  "dr-shelly-set-2-03",
+        "file":  "dr-shelly-set-2-03.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  1040,
+        "y":  61,
+        "width":  221,
+        "height":  347
+    },
+    {
+        "id":  "dr-shelly-set-2-04",
+        "file":  "dr-shelly-set-2-04.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  1287,
+        "y":  78,
+        "width":  213,
+        "height":  329
+    },
+    {
+        "id":  "dr-shelly-set-2-05",
+        "file":  "dr-shelly-set-2-05.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  49,
+        "y":  79,
+        "width":  217,
+        "height":  324
+    },
+    {
+        "id":  "dr-shelly-set-2-06",
+        "file":  "dr-shelly-set-2-06.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  543,
+        "y":  80,
+        "width":  226,
+        "height":  325
+    },
+    {
+        "id":  "dr-shelly-set-2-07",
+        "file":  "dr-shelly-set-2-07.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  759,
+        "y":  511,
+        "width":  257,
+        "height":  355
+    },
+    {
+        "id":  "dr-shelly-set-2-08",
+        "file":  "dr-shelly-set-2-08.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  296,
+        "y":  513,
+        "width":  210,
+        "height":  342
+    },
+    {
+        "id":  "dr-shelly-set-2-09",
+        "file":  "dr-shelly-set-2-09.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  46,
+        "y":  516,
+        "width":  233,
+        "height":  343
+    },
+    {
+        "id":  "dr-shelly-set-2-10",
+        "file":  "dr-shelly-set-2-10.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  536,
+        "y":  520,
+        "width":  213,
+        "height":  339
+    },
+    {
+        "id":  "dr-shelly-set-2-11",
+        "file":  "dr-shelly-set-2-11.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  1035,
+        "y":  522,
+        "width":  242,
+        "height":  340
+    },
+    {
+        "id":  "dr-shelly-set-2-12",
+        "file":  "dr-shelly-set-2-12.png",
+        "source":  "A028C66F-72E2-4472-8464-C260E0FB8E2A.png",
+        "x":  1280,
+        "y":  528,
+        "width":  238,
+        "height":  334
+    },
+    {
+        "id":  "hair-dark-01",
+        "file":  "hair-dark-01.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  941,
+        "y":  44,
+        "width":  220,
+        "height":  231
+    },
+    {
+        "id":  "hair-dark-02",
+        "file":  "hair-dark-02.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  64,
+        "y":  57,
+        "width":  223,
+        "height":  217
+    },
+    {
+        "id":  "hair-dark-03",
+        "file":  "hair-dark-03.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  349,
+        "y":  57,
+        "width":  230,
+        "height":  217
+    },
+    {
+        "id":  "hair-dark-04",
+        "file":  "hair-dark-04.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  652,
+        "y":  57,
+        "width":  207,
+        "height":  217
+    },
+    {
+        "id":  "hair-dark-05",
+        "file":  "hair-dark-05.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  358,
+        "y":  356,
+        "width":  218,
+        "height":  238
+    },
+    {
+        "id":  "hair-dark-06",
+        "file":  "hair-dark-06.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  54,
+        "y":  360,
+        "width":  231,
+        "height":  235
+    },
+    {
+        "id":  "hair-dark-07",
+        "file":  "hair-dark-07.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  652,
+        "y":  376,
+        "width":  210,
+        "height":  222
+    },
+    {
+        "id":  "hair-dark-08",
+        "file":  "hair-dark-08.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  946,
+        "y":  378,
+        "width":  204,
+        "height":  217
+    },
+    {
+        "id":  "hair-dark-09",
+        "file":  "hair-dark-09.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  346,
+        "y":  672,
+        "width":  220,
+        "height":  213
+    },
+    {
+        "id":  "hair-dark-10",
+        "file":  "hair-dark-10.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  66,
+        "y":  677,
+        "width":  202,
+        "height":  208
+    },
+    {
+        "id":  "hair-dark-11",
+        "file":  "hair-dark-11.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  629,
+        "y":  678,
+        "width":  227,
+        "height":  207
+    },
+    {
+        "id":  "hair-dark-12",
+        "file":  "hair-dark-12.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  942,
+        "y":  679,
+        "width":  214,
+        "height":  206
+    },
+    {
+        "id":  "hair-dark-13",
+        "file":  "hair-dark-13.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  334,
+        "y":  951,
+        "width":  234,
+        "height":  212
+    },
+    {
+        "id":  "hair-dark-14",
+        "file":  "hair-dark-14.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  662,
+        "y":  956,
+        "width":  190,
+        "height":  207
+    },
+    {
+        "id":  "hair-dark-15",
+        "file":  "hair-dark-15.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  957,
+        "y":  956,
+        "width":  207,
+        "height":  207
+    },
+    {
+        "id":  "hair-dark-16",
+        "file":  "hair-dark-16.png",
+        "source":  "C61C07C5-101A-47DD-AF1B-01AAB8D31D2E.png",
+        "x":  77,
+        "y":  961,
+        "width":  185,
+        "height":  201
+    },
+    {
+        "id":  "hair-brown-01",
+        "file":  "hair-brown-01.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  62,
+        "y":  57,
+        "width":  228,
+        "height":  218
+    },
+    {
+        "id":  "hair-brown-02",
+        "file":  "hair-brown-02.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  359,
+        "y":  60,
+        "width":  223,
+        "height":  215
+    },
+    {
+        "id":  "hair-brown-03",
+        "file":  "hair-brown-03.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  649,
+        "y":  60,
+        "width":  210,
+        "height":  215
+    },
+    {
+        "id":  "hair-brown-04",
+        "file":  "hair-brown-04.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  932,
+        "y":  60,
+        "width":  217,
+        "height":  215
+    },
+    {
+        "id":  "hair-brown-05",
+        "file":  "hair-brown-05.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  367,
+        "y":  359,
+        "width":  207,
+        "height":  236
+    },
+    {
+        "id":  "hair-brown-06",
+        "file":  "hair-brown-06.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  64,
+        "y":  364,
+        "width":  221,
+        "height":  232
+    },
+    {
+        "id":  "hair-brown-07",
+        "file":  "hair-brown-07.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  654,
+        "y":  374,
+        "width":  203,
+        "height":  221
+    },
+    {
+        "id":  "hair-brown-08",
+        "file":  "hair-brown-08.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  947,
+        "y":  379,
+        "width":  199,
+        "height":  215
+    },
+    {
+        "id":  "hair-brown-09",
+        "file":  "hair-brown-09.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  347,
+        "y":  669,
+        "width":  220,
+        "height":  214
+    },
+    {
+        "id":  "hair-brown-10",
+        "file":  "hair-brown-10.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  634,
+        "y":  669,
+        "width":  224,
+        "height":  211
+    },
+    {
+        "id":  "hair-brown-11",
+        "file":  "hair-brown-11.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  66,
+        "y":  675,
+        "width":  201,
+        "height":  208
+    },
+    {
+        "id":  "hair-brown-12",
+        "file":  "hair-brown-12.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  943,
+        "y":  675,
+        "width":  211,
+        "height":  206
+    },
+    {
+        "id":  "hair-brown-13",
+        "file":  "hair-brown-13.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  339,
+        "y":  945,
+        "width":  228,
+        "height":  216
+    },
+    {
+        "id":  "hair-brown-14",
+        "file":  "hair-brown-14.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  659,
+        "y":  949,
+        "width":  196,
+        "height":  212
+    },
+    {
+        "id":  "hair-brown-15",
+        "file":  "hair-brown-15.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  957,
+        "y":  949,
+        "width":  207,
+        "height":  211
+    },
+    {
+        "id":  "hair-brown-16",
+        "file":  "hair-brown-16.png",
+        "source":  "4617E5B3-4E82-4C91-87C2-E2067D99031D.png",
+        "x":  76,
+        "y":  953,
+        "width":  189,
+        "height":  205
+    }
+]

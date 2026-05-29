@@ -1,81 +1,62 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
-function resolveDataDir(value, fallback) {
-  const dir = typeof value === 'string' ? value.trim() : '';
-  if (dir) {
-    return dir;
-  }
-  return fallback;
-}
-
-const dataDir = resolveDataDir(
-  process.env.MOCHI_DATA_DIR || process.env.DATA_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH,
+const dataDir  = (
+  process.env.MOCHI_DATA_DIR ||
+  process.env.DATA_DIR ||
+  process.env.RAILWAY_VOLUME_MOUNT_PATH ||
   path.join(process.cwd(), 'data')
-);
-const leaderboardPath = path.join(dataDir, 'leaderboard.json');
+).trim();
 
-let cache = null;
+const filePath = path.join(dataDir, 'leaderboard.json');
+
+let cache      = null;       // Map<userId, entry>
 let writeQueue = Promise.resolve();
 
-async function ensureLoaded() {
-  if (cache) {
-    return cache;
-  }
-
+async function load() {
+  if (cache) return cache;
   try {
-    const raw = await readFile(leaderboardPath, 'utf8');
-    const parsed = JSON.parse(raw);
-    cache = new Map(parsed.map((entry) => [entry.userId, entry]));
+    const raw = await readFile(filePath, 'utf8');
+    cache = new Map(JSON.parse(raw).map(e => [e.userId, e]));
   } catch {
     cache = new Map();
   }
-
   return cache;
 }
 
 async function persist() {
+  const board   = await load();
+  const entries = [...board.values()].sort(
+    (a, b) => b.bestScore - a.bestScore || a.userTag.localeCompare(b.userTag)
+  );
   await mkdir(dataDir, { recursive: true });
-  const entries = [...(await ensureLoaded()).values()]
-    .sort((a, b) => b.bestScore - a.bestScore || a.userTag.localeCompare(b.userTag));
-  await writeFile(leaderboardPath, JSON.stringify(entries, null, 2), 'utf8');
+  await writeFile(filePath, JSON.stringify(entries, null, 2), 'utf8');
 }
 
 function enqueuePersist() {
   writeQueue = writeQueue
-    .then(() => persist())
-    .catch((error) => {
-      console.warn('Failed to persist leaderboard:', error.message);
-    });
-  return writeQueue;
+    .then(persist)
+    .catch(err => console.warn('Leaderboard persist failed:', err.message));
 }
 
 export async function recordScore({ userId, userTag, score }) {
-  const board = await ensureLoaded();
+  const board    = await load();
   const existing = board.get(userId);
   const bestScore = existing ? Math.max(existing.bestScore, score) : score;
-
-  const entry = {
-    userId,
-    userTag,
-    bestScore,
-    lastScore: score,
-    updatedAt: new Date().toISOString()
-  };
-
+  const entry    = { userId, userTag, bestScore, lastScore: score, updatedAt: new Date().toISOString() };
   board.set(userId, entry);
-  await enqueuePersist();
+  enqueuePersist();
   return entry;
 }
 
 export async function getLeaderboard(limit = 10) {
-  const board = await ensureLoaded();
+  const board = await load();
   return [...board.values()]
     .sort((a, b) => b.bestScore - a.bestScore || a.userTag.localeCompare(b.userTag))
     .slice(0, limit);
 }
 
 export async function getPersonalBest(userId) {
-  const board = await ensureLoaded();
+  const board = await load();
   return board.get(userId) ?? null;
 }

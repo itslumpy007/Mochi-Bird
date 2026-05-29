@@ -1,457 +1,357 @@
-const canvas = document.getElementById('game');
-const ctx = canvas.getContext('2d');
-const scoreEl = document.getElementById('score');
+// ── DOM refs ──────────────────────────────────────────────────────────────────
+const canvas      = document.getElementById('game');
+const ctx         = canvas.getContext('2d');
+const scoreEl     = document.getElementById('score');
 const bestScoreEl = document.getElementById('bestScore');
-const statusEl = document.getElementById('status');
-const overlayEl = document.getElementById('overlay');
-const overlayTitleEl = document.getElementById('overlayTitle');
-const overlayTextEl = document.getElementById('overlayText');
-const primaryButton = document.getElementById('primaryButton');
-const sessionNoteEl = document.getElementById('sessionNote');
-const leaderboardStatusEl = document.getElementById('leaderboardStatus');
-const leaderboardListEl = document.getElementById('leaderboardList');
-const refreshLeaderboardButton = document.getElementById('refreshLeaderboard');
-const stageEl = document.querySelector('.stage');
-primaryButton.disabled = true;
+const statusEl    = document.getElementById('status');
+const overlayEl   = document.getElementById('overlay');
+const titleEl     = document.getElementById('overlayTitle');
+const textEl      = document.getElementById('overlayText');
+const startBtn    = document.getElementById('startBtn');
+const stageEl     = document.getElementById('stage');
+const lbStatusEl  = document.getElementById('lbStatus');
+const lbListEl    = document.getElementById('lbList');
+const refreshBtn  = document.getElementById('refreshBtn');
 
-const params = new URLSearchParams(window.location.search);
-let sessionId = params.get('sid');
-let isPracticeMode = !sessionId;
-
-let bestScoreKey = 'discord-mochi-bird-best-practice';
-let activityMode = false;
-let discordClientId = null;
-let discordSdk = null;
-let sessionReady = false;
-let leaderboardEntries = [];
-const mobileViewportQuery = window.matchMedia('(max-width: 720px)');
-
-let session = null;
-const birdSprite = new Image();
-birdSprite.src = '/assets/avatar.png';
-
-let width = 360;
-let height = 640;
-let devicePixelRatio = Math.max(1, window.devicePixelRatio || 1);
-let animationFrame = 0;
-let lastTime = 0;
-let started = false;
-let gameOver = false;
-let submitted = false;
-let score = 0;
-let bestScore = 0;
-let elapsedMs = 0;
-let bird = null;
-let pipes = [];
-let spawnTimer = 0;
-let backgroundOffset = 0;
-let clouds = [];
-let stars = [];
-let primaryMode = 'start';
-
-const GRAVITY = 1100;
-const FLAP_VELOCITY = -340;
-const PIPE_SPEED = 170;
-const PIPE_WIDTH = 72;
-const PIPE_GAP = 166;
+// ── Game constants ─────────────────────────────────────────────────────────────
+const GRAVITY       = 1100;
+const FLAP_VEL      = -340;
+const PIPE_SPEED    = 170;
+const PIPE_W        = 72;
+const PIPE_GAP      = 166;
 const PIPE_INTERVAL = 1.35;
-const GROUND_HEIGHT = 90;
+const GROUND_H      = 90;
 
-function clamp(value, min, max) {
-  return Math.max(min, Math.min(max, value));
+// ── State ──────────────────────────────────────────────────────────────────────
+let W = 360, H = 640, DPR = 1;
+
+// Bird is always a valid object — never null
+let bird = { x: 100, y: 270, r: 14, vy: 0 };
+
+let pipes        = [];
+let clouds       = [];
+let stars        = [];
+let bgOffset     = 0;
+let spawnTimer   = 0;
+let elapsedMs    = 0;
+let score        = 0;
+let bestScore    = 0;
+let started      = false;
+let dead         = false;
+let submitted    = false;
+
+// Session / leaderboard
+let sessionId      = new URLSearchParams(location.search).get('sid');
+let isPractice     = !sessionId;
+let sessionData    = null;
+let lbEntries      = [];
+let bestScoreKey   = 'mochi-bird-best-practice';
+
+// Overlay mode: 'start' | 'dead' | 'reload'
+let overlayMode = 'start';
+
+// Bird sprite (custom image)
+const sprite = new Image();
+sprite.src   = '/assets/avatar.png';
+
+// ── Canvas sizing ──────────────────────────────────────────────────────────────
+function resize() {
+  const rect = canvas.getBoundingClientRect();
+  W   = Math.max(1, rect.width);
+  H   = Math.max(1, rect.height);
+  DPR = Math.max(1, window.devicePixelRatio || 1);
+  canvas.width  = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
 }
 
-function formatDiscordUser(user) {
-  const username = user?.username || 'Player';
-  const discriminator = user?.discriminator && user.discriminator !== '0' ? `#${user.discriminator}` : '';
-  const globalName = user?.global_name ? ` (${user.global_name})` : '';
-  return `${username}${discriminator}${globalName}`;
-}
+// ── Reset game state ───────────────────────────────────────────────────────────
+function resetGame() {
+  started    = false;
+  dead       = false;
+  submitted  = false;
+  score      = 0;
+  elapsedMs  = 0;
+  bgOffset   = 0;
+  spawnTimer = 0.65;
+  pipes      = [];
 
-function hydrateBestScore() {
+  bird.x  = W * 0.28;
+  bird.y  = H * 0.42;
+  bird.vy = 0;
+
+  stars = Array.from({ length: 28 }, (_, i) => ({
+    x: (i * 97)  % W,
+    y: (i * 71)  % (H * 0.45),
+    r: 0.8 + (i % 3) * 0.5,
+    twinkle: 0.3 + (i % 5) * 0.11,
+  }));
+
+  clouds = Array.from({ length: 5 }, (_, i) => ({
+    x:     W * (0.2 + i * 0.22),
+    y:     H * (0.12 + (i % 2) * 0.08),
+    speed: 8 + i * 2,
+    size:  0.8 + i * 0.16,
+  }));
+
+  scoreEl.textContent = '0';
   bestScore = Number(localStorage.getItem(bestScoreKey) || 0);
   bestScoreEl.textContent = String(bestScore);
 }
 
-function setSessionReady(ready) {
-  sessionReady = ready;
-  if (primaryButton) {
-    primaryButton.disabled = !ready;
-  }
-}
-
-function updateViewportMode() {
-  const isMobileViewport = mobileViewportQuery.matches || window.innerWidth <= 720;
-  document.body.classList.toggle('mobile-mode', isMobileViewport);
-  document.body.classList.toggle('desktop-mode', !isMobileViewport);
-}
-
-function safeParseJson(text) {
-  if (!text) {
-    return null;
-  }
-
-  try {
-    return JSON.parse(text);
-  } catch {
-    return null;
-  }
-}
-
-function formatLeaderboardName(entry) {
-  return entry?.userTag || entry?.userId || 'Unknown player';
-}
-
-function renderLeaderboard(entries = []) {
-  leaderboardEntries = Array.isArray(entries) ? entries : [];
-
-  if (!leaderboardListEl || !leaderboardStatusEl) {
-    return;
-  }
-
-  leaderboardListEl.innerHTML = '';
-
-  if (!leaderboardEntries.length) {
-    leaderboardStatusEl.textContent = 'No scores yet. Be the first to set one.';
-    const emptyItem = document.createElement('li');
-    emptyItem.className = 'leaderboard-item';
-    emptyItem.innerHTML = `
-      <span class="leaderboard-rank">-</span>
-      <span class="leaderboard-name">Waiting for scores</span>
-      <span class="leaderboard-score">0</span>
-    `;
-    leaderboardListEl.appendChild(emptyItem);
-    return;
-  }
-
-  leaderboardStatusEl.textContent = `${leaderboardEntries.length} score${leaderboardEntries.length === 1 ? '' : 's'} loaded.`;
-
-  for (const [index, entry] of leaderboardEntries.entries()) {
-    const item = document.createElement('li');
-    item.className = 'leaderboard-item';
-    if (session?.userId && entry.userId === session.userId) {
-      item.classList.add('is-player');
-    }
-    item.innerHTML = `
-      <span class="leaderboard-rank">${index + 1}</span>
-      <span class="leaderboard-name">${formatLeaderboardName(entry)}</span>
-      <span class="leaderboard-score">${Number(entry.bestScore) || 0}</span>
-    `;
-    leaderboardListEl.appendChild(item);
-  }
-}
-
-async function loadLeaderboard({ force = false } = {}) {
-  if (!force && leaderboardEntries.length) {
-    return leaderboardEntries;
-  }
-
-  if (leaderboardStatusEl) {
-    leaderboardStatusEl.textContent = 'Loading leaderboard...';
-  }
-
-  try {
-    const response = await fetch('/api/leaderboard', {
-      headers: {
-        Accept: 'application/json'
-      }
-    });
-    const text = await response.text();
-    const payload = safeParseJson(text);
-    const entries = Array.isArray(payload?.leaderboard) ? payload.leaderboard : [];
-    renderLeaderboard(entries);
-    if (!response.ok && response.status !== 404) {
-      throw new Error(payload?.error || text || 'Could not load leaderboard');
-    }
-    return entries;
-  } catch (error) {
-    leaderboardEntries = [];
-    if (leaderboardStatusEl) {
-      leaderboardStatusEl.textContent = `Could not load leaderboard: ${error.message}`;
-    }
-    if (leaderboardListEl) {
-      leaderboardListEl.innerHTML = '';
-    }
-    return [];
-  }
-}
-
-function resizeCanvas() {
-  const rect = canvas.getBoundingClientRect();
-  width = Math.max(1, rect.width);
-  height = Math.max(1, rect.height);
-  devicePixelRatio = Math.max(1, window.devicePixelRatio || 1);
-  canvas.width = Math.floor(width * devicePixelRatio);
-  canvas.height = Math.floor(height * devicePixelRatio);
-  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
-}
-
-function resetGame() {
-  if ((started || gameOver) && !isPracticeMode && sessionId && !submitted && score > 0) {
-    void submitScore('reset');
-  }
-
-  started = false;
-  gameOver = false;
-  submitted = false;
-  score = 0;
-  elapsedMs = 0;
-  bird = {
-    x: width * 0.28,
-    y: height * 0.42,
-    radius: 14,
-    velocity: 0
-  };
-  pipes = [];
-  spawnTimer = 0.65;
-  backgroundOffset = 0;
-  clouds = Array.from({ length: 5 }, (_, index) => ({
-    x: width * (0.2 + index * 0.22),
-    y: height * (0.12 + (index % 2) * 0.08),
-    speed: 8 + index * 2,
-    size: 0.8 + index * 0.16
-  }));
-  stars = Array.from({ length: 28 }, (_, index) => ({
-    x: (index * 97) % width,
-    y: (index * 71) % (height * 0.45),
-    r: 0.8 + (index % 3) * 0.5,
-    twinkle: 0.3 + (index % 5) * 0.11
-  })); 
-  scoreEl.textContent = '0';
-  hydrateBestScore();
-  primaryMode = 'start';
-  showOverlay(
-    isPracticeMode ? 'Practice mode' : 'Ready to fly',
-    isPracticeMode
-      ? 'Click or tap to begin. This run stays local until you open a session from Discord.'
-      : 'Press Space, click, or tap to start your recorded Discord run.',
-    'Start'
-  );
-}
-
-function showOverlay(title, text, buttonLabel = 'Start') {
-  overlayTitleEl.textContent = title;
-  overlayTextEl.textContent = text;
-  primaryButton.textContent = buttonLabel;
+// ── Overlay helpers ────────────────────────────────────────────────────────────
+function showOverlay(title, text, btnLabel) {
+  titleEl.textContent = title;
+  textEl.textContent  = text;
+  startBtn.textContent = btnLabel;
   overlayEl.classList.remove('hidden');
-}
-
-function setPrimaryMode(mode) {
-  primaryMode = mode;
 }
 
 function hideOverlay() {
   overlayEl.classList.add('hidden');
 }
 
-function updateStatus(text) {
+function setStatus(text) {
   statusEl.textContent = text;
 }
 
-async function createActivitySession() {
-  if (!discordSdk) {
-    return null;
-  }
-
-  const participantResponse = await discordSdk.commands.getInstanceConnectedParticipants();
-  const participants = Array.isArray(participantResponse)
-    ? participantResponse
-    : participantResponse?.participants || [];
-  const participant = participants[0];
-  const participantUser = participant?.user || participant;
-
-  if (!participant) {
-    throw new Error('No activity participants found');
-  }
-
-  const channelResponse = await discordSdk.commands.getChannel({
-    channel_id: discordSdk.channelId
-  });
-  const channel = channelResponse?.channel || channelResponse;
-
-  const response = await fetch('/api/activity/session', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      userId: participantUser?.id || participant?.id,
-      userTag: formatDiscordUser(participantUser),
-      channelId: channel?.id || discordSdk.channelId,
-      guildId: channel?.guild_id || channel?.guildId || ''
-    })
-  });
-
-  const payload = await response.json();
-  if (!response.ok) {
-    throw new Error(payload.error || 'Failed to create activity session');
-  }
-
-  return payload.session;
+function enableStart(label = 'Start') {
+  startBtn.textContent = label;
+  startBtn.disabled    = false;
 }
 
-function addPipe() {
-  const topHeight = 60 + Math.random() * (height - GROUND_HEIGHT - PIPE_GAP - 140);
-  pipes.push({
-    x: width + 30,
-    topHeight,
-    passed: false
-  });
+// ── Leaderboard ────────────────────────────────────────────────────────────────
+function renderLeaderboard(entries) {
+  lbEntries      = Array.isArray(entries) ? entries : [];
+  lbListEl.innerHTML = '';
+
+  if (!lbEntries.length) {
+    lbStatusEl.textContent = 'No scores yet — be the first!';
+    const li = document.createElement('li');
+    li.className = 'lb-item';
+    li.innerHTML = `<span class="lb-rank">-</span><span class="lb-name">Waiting for scores</span><span class="lb-score">0</span>`;
+    lbListEl.appendChild(li);
+    return;
+  }
+
+  lbStatusEl.textContent = `${lbEntries.length} player${lbEntries.length === 1 ? '' : 's'}`;
+
+  for (const [i, e] of lbEntries.entries()) {
+    const li = document.createElement('li');
+    li.className = 'lb-item' + (sessionData?.userId === e.userId ? ' me' : '');
+    li.innerHTML = `
+      <span class="lb-rank">${i + 1}</span>
+      <span class="lb-name">${e.userTag || e.userId || 'Unknown'}</span>
+      <span class="lb-score">${Number(e.bestScore) || 0}</span>
+    `;
+    lbListEl.appendChild(li);
+  }
 }
 
+async function fetchLeaderboard(force = false) {
+  if (!force && lbEntries.length) return;
+  lbStatusEl.textContent = 'Loading…';
+  try {
+    const res  = await fetch('/api/leaderboard', { headers: { Accept: 'application/json' } });
+    const data = await res.json();
+    renderLeaderboard(data.leaderboard ?? []);
+  } catch {
+    lbStatusEl.textContent = 'Could not load leaderboard.';
+  }
+}
+
+// ── Score submit ───────────────────────────────────────────────────────────────
+async function submitScore(reason) {
+  if (isPractice || submitted || !sessionId) return;
+  submitted = true;
+
+  try {
+    const res  = await fetch(`/api/session/${sessionId}/score`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ score, durationMs: Math.round(elapsedMs), reason }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Failed to submit score');
+
+    const pb = data.personalBest?.bestScore ?? score;
+    bestScore = Math.max(bestScore, pb);
+    localStorage.setItem(bestScoreKey, String(bestScore));
+    bestScoreEl.textContent = String(bestScore);
+    setStatus(`Submitted! Personal best: ${pb}`);
+    fetchLeaderboard(true);
+  } catch (err) {
+    setStatus(`Submit failed: ${err.message}`);
+  }
+}
+
+// ── Session loading ────────────────────────────────────────────────────────────
+async function loadSession() {
+  // Always reset first so bird and world are ready to render immediately
+  resetGame();
+
+  if (isPractice) {
+    setStatus('Practice mode');
+    showOverlay(
+      'Practice mode',
+      'Scores aren\'t recorded here. Open a session from Discord to go on the leaderboard.',
+      'Play'
+    );
+    enableStart('Play');
+    fetchLeaderboard();
+    return;
+  }
+
+  setStatus('Loading session…');
+  showOverlay('Mochi Bird', 'Loading your session…', 'Start');
+
+  try {
+    const res  = await fetch(`/api/session/${sessionId}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Session not found');
+
+    sessionData  = data.session;
+    bestScoreKey = `mochi-bird-best-${sessionData.userId}`;
+
+    // Load personal best from server
+    try {
+      const pbRes  = await fetch(`/api/leaderboard/${sessionData.userId}`);
+      const pbData = await pbRes.json();
+      if (pbRes.ok && pbData.entry?.bestScore !== undefined) {
+        bestScore = Number(pbData.entry.bestScore) || 0;
+        localStorage.setItem(bestScoreKey, String(bestScore));
+        bestScoreEl.textContent = String(bestScore);
+      }
+    } catch { /* optional */ }
+
+    setStatus(`Ready — ${sessionData.userTag}`);
+    showOverlay(
+      'Ready to fly',
+      `Playing as ${sessionData.userTag}. Your score will be recorded.`,
+      'Start'
+    );
+    enableStart('Start');
+    fetchLeaderboard(true);
+  } catch (err) {
+    setStatus(`Session error: ${err.message}`);
+    overlayMode = 'reload';
+    showOverlay(
+      'Session unavailable',
+      'This link has expired. Use /mochi in Discord to get a fresh one.',
+      'Reload page'
+    );
+    enableStart('Reload page');
+  }
+}
+
+// ── Input ──────────────────────────────────────────────────────────────────────
 function flap() {
-  if (gameOver) {
-    return;
-  }
-
-  if (!sessionReady) {
-    return;
-  }
+  if (startBtn.disabled) return;
+  if (dead) return;
 
   if (!started) {
     started = true;
     hideOverlay();
-    updateStatus(isPracticeMode ? 'Practice mode running' : 'Session running');
+    setStatus(isPractice ? 'Practice — good luck!' : 'Session running');
   }
 
-  bird.velocity = FLAP_VELOCITY;
+  bird.vy = FLAP_VEL;
+}
+
+startBtn.addEventListener('click', () => {
+  if (overlayMode === 'reload') { location.reload(); return; }
+  if (dead && isPractice)       { resetGame(); showOverlay('Practice mode', 'Click Play to go again.', 'Play'); enableStart('Play'); return; }
+  flap();
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'ArrowUp') { e.preventDefault(); flap(); }
+  if (e.code === 'KeyR' && dead && isPractice)    { resetGame(); showOverlay('Practice mode', 'Click Play to go again.', 'Play'); enableStart('Play'); }
+});
+
+stageEl.addEventListener('pointerdown', (e) => { e.preventDefault(); flap(); });
+stageEl.addEventListener('touchstart',  (e) => { e.preventDefault(); flap(); }, { passive: false });
+
+refreshBtn.addEventListener('click', () => fetchLeaderboard(true));
+
+window.addEventListener('resize', () => { resize(); resetGame(); });
+
+// ── Physics ────────────────────────────────────────────────────────────────────
+function addPipe() {
+  const topH = 60 + Math.random() * (H - GROUND_H - PIPE_GAP - 140);
+  pipes.push({ x: W + 30, topH, passed: false });
 }
 
 function rectsOverlap(a, b) {
-  return (
-    a.x < b.x + b.width &&
-    a.x + a.width > b.x &&
-    a.y < b.y + b.height &&
-    a.y + a.height > b.y
-  );
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 function birdBox() {
-  return {
-    x: bird.x - bird.radius,
-    y: bird.y - bird.radius,
-    width: bird.radius * 2,
-    height: bird.radius * 2
-  };
-}
-
-function pipeBoxes(pipe) {
-  const gapTop = pipe.topHeight;
-  const gapBottom = pipe.topHeight + PIPE_GAP;
-  return [
-    {
-      x: pipe.x,
-      y: 0,
-      width: PIPE_WIDTH,
-      height: gapTop
-    },
-    {
-      x: pipe.x,
-      y: gapBottom,
-      width: PIPE_WIDTH,
-      height: height - GROUND_HEIGHT - gapBottom
-    }
-  ];
+  return { x: bird.x - bird.r, y: bird.y - bird.r, w: bird.r * 2, h: bird.r * 2 };
 }
 
 function endGame(reason) {
-  if (gameOver) {
-    return;
-  }
-
-  gameOver = true;
+  if (dead) return;
+  dead    = true;
   started = false;
-  updateStatus(`Game over: ${reason}`);
-  showOverlay(
-    'Game over',
-    `You scored ${score}. ${isPracticeMode ? 'Press the button to try again.' : 'This run has been recorded in Discord.'}`,
-    isPracticeMode ? 'Play again' : 'Play practice'
-  );
-  setPrimaryMode(isPracticeMode ? 'practice-restart' : 'practice-open');
+  setStatus(`Game over: ${reason}`);
+
+  const msg = isPractice
+    ? 'Press R or click below to try again.'
+    : 'Your score has been recorded.';
+
+  showOverlay('Game over', `You scored ${score}. ${msg}`, isPractice ? 'Play again' : 'Done');
+  startBtn.disabled = isPractice ? false : true;
+
   submitScore(reason);
-}
-
-async function submitScore(reason) {
-  if (isPracticeMode || submitted || !sessionId) {
-    return;
-  }
-
-  submitted = true;
-
-  try {
-    const response = await fetch(`/api/session/${sessionId}/score`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        score,
-        durationMs: Math.round(elapsedMs),
-        reason
-      })
-    });
-
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.error || 'Failed to submit score');
-    }
-
-    const submittedBest = payload.personalBest?.bestScore ?? score;
-    bestScore = Math.max(bestScore, submittedBest);
+  if (score > bestScore) {
+    bestScore = score;
     localStorage.setItem(bestScoreKey, String(bestScore));
     bestScoreEl.textContent = String(bestScore);
-    updateStatus(`Score submitted. Personal best: ${submittedBest}.`);
-    void loadLeaderboard({ force: true });
-  } catch (error) {
-    updateStatus(`Could not submit score: ${error.message}`);
   }
 }
 
-function update(deltaSeconds) {
-  if (!started || gameOver) {
-    return;
+function update(dt) {
+  if (!started || dead) return;
+
+  elapsedMs += dt * 1000;
+  bird.vy   += GRAVITY * dt;
+  bird.y    += bird.vy  * dt;
+  bgOffset   = (bgOffset + PIPE_SPEED * dt) % W;
+
+  // Ceiling
+  if (bird.y - bird.r <= 0) {
+    bird.y  = bird.r;
+    bird.vy = Math.max(0, bird.vy);
   }
 
-  elapsedMs += deltaSeconds * 1000;
-  bird.velocity += GRAVITY * deltaSeconds;
-  bird.y += bird.velocity * deltaSeconds;
-  backgroundOffset = (backgroundOffset + PIPE_SPEED * deltaSeconds) % width;
-
-  spawnTimer -= deltaSeconds;
-  if (spawnTimer <= 0) {
-    addPipe();
-    spawnTimer = PIPE_INTERVAL;
-  }
-
-  for (const pipe of pipes) {
-    pipe.x -= PIPE_SPEED * deltaSeconds;
-  }
-
-  pipes = pipes.filter((pipe) => pipe.x > -PIPE_WIDTH - 40);
-
-  const birdBounds = birdBox();
-
-  if (bird.y + bird.radius >= height - GROUND_HEIGHT) {
-    bird.y = height - GROUND_HEIGHT - bird.radius;
+  // Ground
+  if (bird.y + bird.r >= H - GROUND_H) {
+    bird.y = H - GROUND_H - bird.r;
     endGame('hit the ground');
     return;
   }
 
-  if (bird.y - bird.radius <= 0) {
-    bird.y = bird.radius;
-    bird.velocity = Math.max(0, bird.velocity);
-  }
+  // Pipes
+  spawnTimer -= dt;
+  if (spawnTimer <= 0) { addPipe(); spawnTimer = PIPE_INTERVAL; }
 
-  for (const pipe of pipes) {
-    const [topPipe, bottomPipe] = pipeBoxes(pipe);
-    if (rectsOverlap(birdBounds, topPipe) || rectsOverlap(birdBounds, bottomPipe)) {
+  const bb = birdBox();
+
+  for (const p of pipes) {
+    p.x -= PIPE_SPEED * dt;
+
+    const top    = { x: p.x, y: 0,            w: PIPE_W, h: p.topH };
+    const bottom = { x: p.x, y: p.topH + PIPE_GAP, w: PIPE_W, h: H - GROUND_H - (p.topH + PIPE_GAP) };
+
+    if (rectsOverlap(bb, top) || rectsOverlap(bb, bottom)) {
       endGame('hit a pipe');
       return;
     }
 
-    if (!pipe.passed && pipe.x + PIPE_WIDTH < bird.x - bird.radius) {
-      pipe.passed = true;
-      score += 1;
+    if (!p.passed && p.x + PIPE_W < bird.x - bird.r) {
+      p.passed = true;
+      score++;
       scoreEl.textContent = String(score);
       if (score > bestScore) {
         bestScore = score;
@@ -460,346 +360,184 @@ function update(deltaSeconds) {
       }
     }
   }
+
+  pipes = pipes.filter(p => p.x > -PIPE_W - 40);
 }
 
-function drawSky() {
-  const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
-  skyGradient.addColorStop(0, '#78cffd');
-  skyGradient.addColorStop(0.6, '#beeefe');
-  skyGradient.addColorStop(1, '#ffe28a');
-  ctx.fillStyle = skyGradient;
-  ctx.fillRect(0, 0, width, height);
+// ── Drawing helpers ────────────────────────────────────────────────────────────
+function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-  ctx.fillStyle = 'rgba(255,255,255,0.32)';
-  for (const star of stars) {
-    const alpha = 0.3 + Math.sin((elapsedMs / 1000) * star.twinkle + star.x) * 0.2;
-    ctx.globalAlpha = clamp(alpha, 0.12, 0.45);
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+// ── Draw calls ─────────────────────────────────────────────────────────────────
+function drawSky() {
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0,   '#78cffd');
+  g.addColorStop(0.6, '#beeefe');
+  g.addColorStop(1,   '#ffe28a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  for (const s of stars) {
+    const alpha = 0.3 + Math.sin((elapsedMs / 1000) * s.twinkle + s.x) * 0.2;
+    ctx.globalAlpha = clamp(alpha, 0.1, 0.45);
+    ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.globalAlpha = 1;
 }
 
-function drawCloud(x, y, size) {
-  ctx.save();
-  ctx.translate(x, y);
-  ctx.scale(size, size);
-  ctx.fillStyle = 'rgba(255,255,255,0.68)';
-  ctx.beginPath();
-  ctx.arc(0, 0, 18, 0, Math.PI * 2);
-  ctx.arc(18, -8, 22, 0, Math.PI * 2);
-  ctx.arc(38, 0, 16, 0, Math.PI * 2);
-  ctx.arc(20, 8, 19, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+function drawClouds() {
+  for (const c of clouds) {
+    if (started) {
+      c.x -= c.speed * 0.008;
+      if (c.x < -120) { c.x = W + 120; c.y = H * (0.12 + Math.random() * 0.18); }
+    }
+    ctx.save();
+    ctx.translate(c.x, c.y);
+    ctx.scale(c.size, c.size);
+    ctx.fillStyle = 'rgba(255,255,255,.66)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+    ctx.arc(18, -8, 22, 0, Math.PI * 2);
+    ctx.arc(38, 0, 16, 0, Math.PI * 2);
+    ctx.arc(20, 8, 19, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
 }
 
 function drawPipes() {
-  for (const pipe of pipes) {
-    const radius = 12;
-    const capHeight = 16;
+  for (const p of pipes) {
+    const capH   = 16;
+    const botY   = p.topH + PIPE_GAP;
+    const botH   = H - GROUND_H - botY;
 
+    // Top pipe body
     ctx.fillStyle = '#1d7f52';
-    ctx.strokeStyle = '#145337';
-    ctx.lineWidth = 4;
-
-    const topHeight = pipe.topHeight;
-    const bottomY = pipe.topHeight + PIPE_GAP;
-    const bottomHeight = height - GROUND_HEIGHT - bottomY;
-
-    ctx.beginPath();
-    roundRect(ctx, pipe.x, 0, PIPE_WIDTH, topHeight, radius, true, false);
+    roundRect(p.x, 0, PIPE_W, p.topH, 10);
     ctx.fill();
-    ctx.stroke();
 
-    ctx.beginPath();
-    roundRect(ctx, pipe.x - 4, Math.max(0, topHeight - capHeight), PIPE_WIDTH + 8, capHeight, 8, true, false);
+    // Top pipe cap
     ctx.fillStyle = '#2fd18d';
+    roundRect(p.x - 4, Math.max(0, p.topH - capH), PIPE_W + 8, capH, 6);
     ctx.fill();
 
-    ctx.beginPath();
-    roundRect(ctx, pipe.x, bottomY, PIPE_WIDTH, bottomHeight, radius, true, false);
+    // Bottom pipe body
     ctx.fillStyle = '#1d7f52';
+    roundRect(p.x, botY, PIPE_W, botH, 10);
     ctx.fill();
-    ctx.stroke();
 
-    ctx.beginPath();
-    roundRect(ctx, pipe.x - 4, bottomY, PIPE_WIDTH + 8, capHeight, 8, true, false);
+    // Bottom pipe cap
     ctx.fillStyle = '#2fd18d';
+    roundRect(p.x - 4, botY, PIPE_W + 8, capH, 6);
     ctx.fill();
   }
 }
 
 function drawGround() {
-  const groundY = height - GROUND_HEIGHT;
-  const groundGradient = ctx.createLinearGradient(0, groundY, 0, height);
-  groundGradient.addColorStop(0, '#e6c265');
-  groundGradient.addColorStop(1, '#c69a3a');
-  ctx.fillStyle = groundGradient;
-  ctx.fillRect(0, groundY, width, GROUND_HEIGHT);
+  const y = H - GROUND_H;
+  const g = ctx.createLinearGradient(0, y, 0, H);
+  g.addColorStop(0, '#e6c265');
+  g.addColorStop(1, '#c69a3a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, y, W, GROUND_H);
 
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.14)';
-  for (let i = -1; i < width / 36 + 2; i += 1) {
-    const x = (i * 36 - backgroundOffset * 0.6) % (width + 36);
-    ctx.fillRect(x, groundY + 8, 22, 4);
+  ctx.fillStyle = 'rgba(0,0,0,.13)';
+  for (let i = -1; i < W / 36 + 2; i++) {
+    const x = ((i * 36) - bgOffset * 0.6 % (W + 36));
+    ctx.fillRect(x, y + 8, 22, 4);
   }
 }
 
 function drawBird() {
-  if (!bird) return;
-  const tilt = clamp(bird.velocity / 400, -0.6, 0.8);
+  const tilt = clamp(bird.vy / 400, -0.6, 0.8);
   ctx.save();
   ctx.translate(bird.x, bird.y);
   ctx.rotate(tilt);
 
+  // Always draw the base circle so something is always visible
   ctx.fillStyle = '#ffd84d';
   ctx.beginPath();
-  ctx.arc(0, 0, bird.radius, 0, Math.PI * 2);
+  ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
   ctx.fill();
 
+  // Wing
   ctx.fillStyle = '#ffb31f';
   ctx.beginPath();
   ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
+  // Eye
   ctx.fillStyle = '#1a2230';
   ctx.beginPath();
   ctx.arc(5, -4, 2.1, 0, Math.PI * 2);
   ctx.fill();
 
+  // Beak
   ctx.fillStyle = '#f27d2f';
   ctx.beginPath();
   ctx.moveTo(11, -1);
-  ctx.lineTo(20, 3);
-  ctx.lineTo(11, 7);
+  ctx.lineTo(20,  3);
+  ctx.lineTo(11,  7);
   ctx.closePath();
   ctx.fill();
 
-  if (birdSprite.complete && birdSprite.naturalWidth > 0) {
-    const size = bird.radius * 2.35;
-    ctx.drawImage(birdSprite, -size / 2, -size / 2, size, size);
+  // Custom sprite drawn on top of the base circle (clipped to circle)
+  if (sprite.complete && sprite.naturalWidth > 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
+    ctx.clip();
+    const s = bird.r * 2;
+    ctx.drawImage(sprite, -bird.r, -bird.r, s, s);
+    ctx.restore();
   }
 
   ctx.restore();
 }
 
-function drawHudOverlay() {
-  if (started || gameOver) {
-    return;
-  }
-  ctx.save();
-  ctx.fillStyle = 'rgba(7, 16, 24, 0.12)';
-  ctx.fillRect(0, 0, width, height);
-  ctx.restore();
+function drawDimOverlay() {
+  if (started || dead) return;
+  ctx.fillStyle = 'rgba(7,16,24,.10)';
+  ctx.fillRect(0, 0, W, H);
 }
 
-function roundRect(context, x, y, w, h, r, fill = true, stroke = false) {
-  if (typeof r === 'number') {
-    r = { tl: r, tr: r, br: r, bl: r };
-  } else {
-    r = { tl: 0, tr: 0, br: 0, bl: 0, ...r };
-  }
-  context.beginPath();
-  context.moveTo(x + r.tl, y);
-  context.lineTo(x + w - r.tr, y);
-  context.quadraticCurveTo(x + w, y, x + w, y + r.tr);
-  context.lineTo(x + w, y + h - r.br);
-  context.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
-  context.lineTo(x + r.bl, y + h);
-  context.quadraticCurveTo(x, y + h, x, y + h - r.bl);
-  context.lineTo(x, y + r.tl);
-  context.quadraticCurveTo(x, y, x + r.tl, y);
-  context.closePath();
-  if (fill) {
-    context.fill();
-  }
-  if (stroke) {
-    context.stroke();
-  }
-}
+// ── Main loop ──────────────────────────────────────────────────────────────────
+let lastTs = 0;
 
-function render() {
-  ctx.clearRect(0, 0, width, height);
+function loop(ts) {
+  const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0);
+  lastTs = ts;
+
+  update(dt);
+
+  ctx.clearRect(0, 0, W, H);
   drawSky();
-
-  for (const cloud of clouds) {
-    cloud.x -= cloud.speed * 0.008;
-    if (cloud.x < -120) {
-      cloud.x = width + 120;
-      cloud.y = height * (0.12 + Math.random() * 0.18);
-    }
-    drawCloud(cloud.x, cloud.y, cloud.size);
-  }
-
+  drawClouds();
   drawPipes();
   drawGround();
   drawBird();
-  drawHudOverlay();
+  drawDimOverlay();
+
+  requestAnimationFrame(loop);
 }
 
-function loop(timestamp) {
-  if (!lastTime) {
-    lastTime = timestamp;
-  }
-
-  const deltaSeconds = Math.min(0.033, (timestamp - lastTime) / 1000);
-  lastTime = timestamp;
-
-  update(deltaSeconds);
-  render();
-  animationFrame = requestAnimationFrame(loop);
-}
-
-async function loadSession() {
-  setSessionReady(false);
-  try {
-    const configResponse = await fetch('/api/config');
-    const configPayload = await configResponse.json();
-    if (configResponse.ok) {
-      activityMode = Boolean(configPayload.activityMode);
-      discordClientId = configPayload.discordClientId;
-    }
-  } catch {
-    // Config lookup is optional.
-  }
-
-  if (activityMode && discordClientId) {
-    try {
-      const sdkModule = await import('https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk/+esm');
-      discordSdk = new sdkModule.DiscordSDK(discordClientId);
-      await discordSdk.ready();
-      updateStatus('Discord Activity ready');
-      sessionNoteEl.textContent = 'Running inside Discord as an Activity.';
-      if (!sessionId) {
-        const activitySession = await createActivitySession();
-        sessionId = activitySession.id;
-        isPracticeMode = false;
-        session = activitySession;
-        bestScoreKey = `discord-mochi-bird-best-${session.userId}`;
-        const bestResponse = await fetch(`/api/leaderboard/${session.userId}`);
-        if (bestResponse.ok) {
-          const bestPayload = await bestResponse.json();
-          if (bestPayload?.entry?.bestScore !== undefined) {
-            bestScore = Number(bestPayload.entry.bestScore) || 0;
-            localStorage.setItem(bestScoreKey, String(bestScore));
-          }
-        }
-        sessionNoteEl.textContent = `Activity session created for ${session.userTag}.`;
-        updateStatus(`Ready for ${session.userTag}`);
-      }
-      void loadLeaderboard({ force: true });
-    } catch (error) {
-      updateStatus(`Discord Activity handshake failed: ${error.message}`);
-    }
-  }
-
-  if (!sessionId && isPracticeMode) {
-    updateStatus(activityMode ? 'Activity practice ready' : 'Practice mode ready');
-    if (!activityMode) {
-      sessionNoteEl.textContent = 'Practice mode: this run is local only.';
-    }
-    resetGame();
-    setSessionReady(true);
-    void loadLeaderboard();
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/session/${sessionId}`);
-    const payload = await response.json();
-    if (!response.ok) {
-      throw new Error(payload.error || 'Session not found');
-    }
-
-    session = payload.session;
-    bestScoreKey = `discord-mochi-bird-best-${session.userId}`;
-    sessionNoteEl.textContent = `Session linked to ${session.userTag}.`;
-    updateStatus(`Ready for ${session.userTag}`);
-    try {
-      const bestResponse = await fetch(`/api/leaderboard/${session.userId}`);
-      if (bestResponse.ok) {
-        const bestPayload = await bestResponse.json();
-        if (bestPayload?.entry?.bestScore !== undefined) {
-          bestScore = Number(bestPayload.entry.bestScore) || 0;
-          localStorage.setItem(bestScoreKey, String(bestScore));
-        }
-      }
-    } catch {
-      // Best score lookup is optional.
-    }
-    resetGame();
-    setSessionReady(true);
-    void loadLeaderboard({ force: true });
-  } catch (error) {
-    updateStatus(`Session error: ${error.message}`);
-    resetGame();
-    setPrimaryMode('reload');
-    showOverlay(
-      'Session unavailable',
-      'The Discord session is missing or expired. Open a fresh run from the bot.',
-      'Reload'
-    );
-    setSessionReady(true);
-  }
-}
-
-function onPrimaryAction() {
-  if (primaryMode === 'reload') {
-    window.location.reload();
-    return;
-  }
-
-  if (primaryMode === 'practice-open') {
-    window.location.href = '/play';
-    return;
-  }
-
-  if (gameOver && isPracticeMode) {
-    resetGame();
-    hideOverlay();
-    return;
-  }
-
-  if (!started) {
-    flap();
-  }
-}
-
-window.addEventListener('resize', () => {
-  resizeCanvas();
-  resetGame();
-  updateViewportMode();
-});
-
-window.addEventListener('keydown', (event) => {
-  if (event.code === 'Space' || event.code === 'ArrowUp') {
-    event.preventDefault();
-    flap();
-  }
-  if (event.code === 'KeyR' && isPracticeMode && gameOver) {
-    resetGame();
-    hideOverlay();
-  }
-});
-
-function handleInput(event) {
-  if (event.cancelable) {
-    event.preventDefault();
-  }
-  flap();
-}
-
-stageEl?.addEventListener('pointerdown', handleInput);
-stageEl?.addEventListener('touchstart', handleInput, { passive: false });
-
-refreshLeaderboardButton?.addEventListener('click', () => {
-  void loadLeaderboard({ force: true });
-});
-
-primaryButton.addEventListener('click', onPrimaryAction);
-
-resizeCanvas();
-updateViewportMode();
-void loadSession();
-animationFrame = requestAnimationFrame(loop);
+// ── Boot ───────────────────────────────────────────────────────────────────────
+resize();
+requestAnimationFrame(loop);   // loop starts immediately — bird is already valid
+loadSession();                 // session loads async, updates overlay & status

@@ -7,60 +7,56 @@
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div class="background-orb orb-a"></div>
-    <div class="background-orb orb-b"></div>
-    <main class="app-shell">
+    <div class="bg-orb orb-a"></div>
+    <div class="bg-orb orb-b"></div>
+
+    <main class="shell">
       <section class="hero">
-        <div class="eyebrow">Discord launch game</div>
+        <div class="eyebrow">Discord Game</div>
         <h1>Mochi Bird</h1>
-        <p>
-          A browser-first Mochi Bird that opens from Discord, records your score, and keeps a
-          leaderboard.
-        </p>
+        <p>Flap your way to the top. Scores are tracked and posted back to Discord.</p>
       </section>
 
-      <div class="content-grid">
-        <section class="game-card">
+      <div class="grid">
+        <!-- Game card -->
+        <section class="card game-card">
           <div class="hud">
             <div class="stat">
-              <span>Score</span>
+              <span class="label">Score</span>
               <strong id="score">0</strong>
             </div>
             <div class="stat">
-              <span>Best</span>
+              <span class="label">Best</span>
               <strong id="bestScore">0</strong>
             </div>
-            <div class="status" id="status">Loading session...</div>
+            <span class="status" id="status">Loading…</span>
           </div>
 
-          <div class="stage">
+          <div class="stage" id="stage">
             <canvas id="game"></canvas>
             <div class="overlay" id="overlay">
               <div class="overlay-card">
-                <h2 id="overlayTitle">Preparing game</h2>
-                <p id="overlayText">Loading session data.</p>
-                <button id="primaryButton" type="button">Start</button>
+                <h2 id="overlayTitle">Mochi Bird</h2>
+                <p id="overlayText">Getting things ready…</p>
+                <button id="startBtn" type="button" disabled>Start</button>
               </div>
             </div>
           </div>
 
-          <div class="footer">
-            <p>Flap with Space, click, or tap. Opened from Discord? Your score will be recorded automatically.</p>
-            <p id="sessionNote">Practice mode is available when you open this page directly.</p>
-          </div>
+          <p class="hint">Tap, click, or press Space to flap.</p>
         </section>
 
-        <aside class="leaderboard-card">
-          <div class="panel-header">
+        <!-- Leaderboard card -->
+        <aside class="card lb-card">
+          <div class="lb-header">
             <div>
-              <div class="panel-kicker">Leaderboard</div>
-              <h2>Top Mochi runs</h2>
+              <div class="eyebrow">Leaderboard</div>
+              <h2>Top runs</h2>
             </div>
-            <button id="refreshLeaderboard" class="ghost-button" type="button">Refresh</button>
+            <button id="refreshBtn" class="ghost" type="button">Refresh</button>
           </div>
-
-          <p class="leaderboard-status" id="leaderboardStatus">Loading leaderboard...</p>
-          <ol class="leaderboard-list" id="leaderboardList"></ol>
+          <p class="lb-status" id="lbStatus">Loading…</p>
+          <ol class="lb-list" id="lbList"></ol>
         </aside>
       </div>
     </main>

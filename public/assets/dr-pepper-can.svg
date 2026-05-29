@@ -1,0 +1,31 @@
+<svg width="512" height="1024" viewBox="0 0 512 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="body" x1="128" y1="0" x2="384" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF4D45"/>
+      <stop offset="0.45" stop-color="#BE1E2D"/>
+      <stop offset="1" stop-color="#82131D"/>
+    </linearGradient>
+    <linearGradient id="shine" x1="160" y1="0" x2="256" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop stop-color="rgba(255,255,255,0.75)"/>
+      <stop offset="0.2" stop-color="rgba(255,255,255,0.25)"/>
+      <stop offset="1" stop-color="rgba(255,255,255,0)"/>
+    </linearGradient>
+    <linearGradient id="metal" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+      <stop stop-color="#E6EEF7"/>
+      <stop offset="1" stop-color="#B7C3D1"/>
+    </linearGradient>
+  </defs>
+  <ellipse cx="256" cy="88" rx="146" ry="34" fill="#CDD7E3"/>
+  <rect x="106" y="92" width="300" height="836" rx="140" fill="url(#body)" stroke="rgba(255,255,255,0.18)" stroke-width="8"/>
+  <rect x="140" y="70" width="232" height="62" rx="31" fill="url(#metal)"/>
+  <rect x="140" y="870" width="232" height="64" rx="32" fill="url(#metal)"/>
+  <path d="M160 140C188 126 218 118 256 118C294 118 324 126 352 140V882C324 896 294 904 256 904C218 904 188 896 160 882V140Z" fill="url(#shine)" opacity="0.38"/>
+  <path d="M180 280C205 252 225 238 256 238C287 238 307 252 332 280V736C307 764 287 778 256 778C225 778 205 764 180 736V280Z" fill="rgba(255,255,255,0.06)"/>
+  <text x="256" y="348" text-anchor="middle" fill="#FFF7F5" font-family="Georgia, 'Times New Roman', serif" font-size="56" font-weight="700" letter-spacing="-1">Dr Pepper</text>
+  <text x="256" y="412" text-anchor="middle" fill="#FFF7F5" font-family="Trebuchet MS, Verdana, sans-serif" font-size="24" font-weight="700" letter-spacing="6">CAN</text>
+  <circle cx="256" cy="534" r="86" fill="rgba(255,255,255,0.1)" stroke="rgba(255,255,255,0.25)" stroke-width="4"/>
+  <text x="256" y="557" text-anchor="middle" fill="#FFF7F5" font-family="Trebuchet MS, Verdana, sans-serif" font-size="78" font-weight="800">23</text>
+  <text x="256" y="616" text-anchor="middle" fill="#FFF7F5" font-family="Trebuchet MS, Verdana, sans-serif" font-size="20" font-weight="700" letter-spacing="3">FLAVOR</text>
+  <path d="M230 666C236 700 244 732 256 770C268 732 276 700 282 666H230Z" fill="rgba(255,255,255,0.15)"/>
+  <ellipse cx="256" cy="930" rx="126" ry="22" fill="rgba(0,0,0,0.14)"/>
+</svg>

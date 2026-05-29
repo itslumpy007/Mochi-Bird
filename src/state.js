@@ -1,82 +1,57 @@
 import { randomUUID } from 'node:crypto';
 
-const ttlMinutes = Number(process.env.SESSION_TTL_MINUTES || 30);
-const DEFAULT_TTL_MS = Number.isFinite(ttlMinutes) && ttlMinutes > 0 ? ttlMinutes * 60 * 1000 : 30 * 60 * 1000;
+const TTL_MS   = Number(process.env.SESSION_TTL_MINUTES || 30) * 60 * 1000;
 const sessions = new Map();
 
-function now() {
-  return Date.now();
+function now() { return Date.now(); }
+
+function prune() {
+  const t = now();
+  for (const [id, s] of sessions) {
+    if (s.expiresAt <= t) sessions.delete(id);
+  }
 }
 
-export function createSession({
-  userId,
-  userTag,
-  channelId,
-  guildId,
-  baseUrl,
-  ttlMs = DEFAULT_TTL_MS
-}) {
-  const id = randomUUID();
+export function createSession({ userId, userTag, channelId, guildId = '', baseUrl = '' }) {
+  prune();
+  const id        = randomUUID();
   const createdAt = now();
-
-  const session = {
-    id,
-    userId,
-    userTag,
-    channelId,
-    guildId,
+  const session   = {
+    id, userId, userTag, channelId, guildId, baseUrl,
     createdAt,
-    expiresAt: createdAt + ttlMs,
-    status: 'active',
-    score: null,
+    expiresAt:   createdAt + TTL_MS,
+    status:      'active',
+    score:       null,
     submittedAt: null,
-    baseUrl
   };
-
   sessions.set(id, session);
   return session;
 }
 
 export function getSession(id) {
-  cleanupSessions();
+  prune();
   return sessions.get(id) ?? null;
 }
 
-export function completeSession(id, payload) {
-  cleanupSessions();
-  const session = sessions.get(id);
-  if (!session) {
-    return null;
-  }
-
-  if (session.status === 'completed') {
-    return session;
-  }
-
-  session.status = 'completed';
-  session.score = payload.score;
-  session.submittedAt = now();
-  session.lastResult = payload;
-  sessions.set(id, session);
-  return session;
+export function completeSession(id, { score, durationMs, reason }) {
+  prune();
+  const s = sessions.get(id);
+  if (!s || s.status === 'completed') return s ?? null;
+  s.status      = 'completed';
+  s.score       = score;
+  s.durationMs  = durationMs;
+  s.reason      = reason;
+  s.submittedAt = now();
+  return s;
 }
 
-export function publicSession(session) {
-  if (!session) {
-    return null;
-  }
-
+export function publicSession(s) {
+  if (!s) return null;
   return {
-    id: session.id,
-    userTag: session.userTag,
-    userId: session.userId,
-    channelId: session.channelId,
-    guildId: session.guildId,
-    createdAt: session.createdAt,
-    expiresAt: session.expiresAt,
-    status: session.status,
-    score: session.score,
-    submittedAt: session.submittedAt
+    id: s.id, userId: s.userId, userTag: s.userTag,
+    channelId: s.channelId, guildId: s.guildId,
+    createdAt: s.createdAt, expiresAt: s.expiresAt,
+    status: s.status, score: s.score, submittedAt: s.submittedAt,
   };
 }
 
@@ -84,13 +59,4 @@ export function buildPlayUrl(baseUrl, sessionId) {
   const url = new URL('/play', baseUrl);
   url.searchParams.set('sid', sessionId);
   return url.toString();
-}
-
-export function cleanupSessions() {
-  const current = now();
-  for (const [id, session] of sessions.entries()) {
-    if (session.expiresAt <= current) {
-      sessions.delete(id);
-    }
-  }
 }
