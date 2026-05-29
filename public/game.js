@@ -502,44 +502,81 @@ let discordSdk = null;
 
 async function tryInitDiscordActivity() {
   try {
-    // Try to load Discord SDK
-    const sdkModule = await import('https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk/+esm');
-    const clientId = (await fetch('/api/config').then(r => r.json())).discordClientId;
+    console.log('[activity] Attempting Discord Activity initialization...');
 
-    if (!clientId) return false;
+    // Check if we're in a Discord iframe (iframe detection)
+    if (window.self === window.top) {
+      console.log('[activity] Not in iframe, skipping Discord Activity');
+      return false;
+    }
 
+    // Load Discord SDK with timeout
+    console.log('[activity] Loading Discord SDK...');
+    const sdkModule = await Promise.race([
+      import('https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk/+esm'),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SDK load timeout')), 5000)
+      ),
+    ]);
+
+    // Get config
+    const configRes = await fetch('/api/config');
+    const config = await configRes.json();
+    const clientId = config.discordClientId;
+
+    if (!clientId) {
+      console.log('[activity] No Discord client ID configured');
+      return false;
+    }
+
+    console.log('[activity] Initializing Discord SDK...');
     discordSdk = new sdkModule.DiscordSDK(clientId);
-    await discordSdk.ready();
+    await Promise.race([
+      discordSdk.ready(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SDK ready timeout')), 5000)
+      ),
+    ]);
 
-    // We're in a Discord Activity iframe — create a session
+    console.log('[activity] Getting activity participants...');
     const participants = await discordSdk.commands.getInstanceConnectedParticipants();
     const participant = participants?.[0];
-    if (!participant?.user?.id) throw new Error('No activity participant');
 
-    const channel = await discordSdk.commands.getChannel({ channel_id: discordSdk.channelId });
+    if (!participant?.user?.id) {
+      throw new Error(`No participant found (got: ${JSON.stringify(participants)})`);
+    }
 
+    console.log('[activity] Getting channel info...');
+    const channel = await discordSdk.commands.getChannel({
+      channel_id: discordSdk.channelId,
+    });
+
+    console.log('[activity] Creating activity session...');
     const res = await fetch('/api/activity/session', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         userId: participant.user.id,
-        userTag: participant.user.username,
+        userTag: participant.user.username || participant.user.global_name || 'Player',
         channelId: discordSdk.channelId,
         guildId: channel?.guild_id || '',
       }),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
+    if (!res.ok) {
+      throw new Error(`Session creation failed: ${data.error}`);
+    }
 
     sessionId = data.session.id;
     sessionData = data.session;
     isPractice = false;
     bestScoreKey = `mochi-bird-best-${sessionData.userId}`;
 
+    console.log('[activity] Discord Activity initialized successfully');
     return true;
   } catch (err) {
-    console.log('Discord Activity not available:', err.message);
+    console.warn('[activity] Discord Activity initialization failed:', err.message);
     return false;
   }
 }
@@ -547,8 +584,12 @@ async function tryInitDiscordActivity() {
 async function loadSession() {
   resetGame();
 
-  // Try Discord Activity first
-  const isActivity = await tryInitDiscordActivity();
+  // Try Discord Activity first (with 10 second timeout to prevent hanging)
+  console.log('[boot] Starting session load...');
+  const isActivity = await Promise.race([
+    tryInitDiscordActivity(),
+    new Promise(resolve => setTimeout(() => { console.warn('[boot] Activity init timeout'); resolve(false); }, 10000)),
+  ]);
 
   if (!sessionId) {
     // Practice mode
