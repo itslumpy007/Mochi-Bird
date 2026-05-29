@@ -164,8 +164,7 @@ function renderLeaderboard(entries) {
   });
 }
 
-async function fetchLeaderboard(force = false) {
-  if (!force && lbEntries.length) return;
+async function fetchLeaderboard() {
   try {
     const res = await fetch('/api/leaderboard');
     const data = await res.json();
@@ -235,7 +234,7 @@ async function submitScore() {
     bestScore = Math.max(bestScore, pb);
     localStorage.setItem(bestScoreKey, String(bestScore));
     bestScoreEl.textContent = String(bestScore);
-    fetchLeaderboard(true);
+    fetchLeaderboard();
   } catch (err) {
     console.error('Score submit failed:', err);
   }
@@ -322,7 +321,10 @@ stageEl.addEventListener('touchstart', (e) => {
   if (gameState === 'playing') bird.vy = FLAP_VEL;
 }, { passive: false });
 
-refreshBtn.addEventListener('click', () => fetchLeaderboard(true));
+refreshBtn.addEventListener('click', () => fetchLeaderboard());
+
+// Auto-refresh leaderboard every 15 seconds
+setInterval(() => fetchLeaderboard(), 15000);
 
 window.addEventListener('resize', () => { applyLayout(); resize(); });
 
@@ -576,7 +578,7 @@ async function loadSession() {
     } catch {}
 
     setGameState('ready');
-    fetchLeaderboard(true);
+    fetchLeaderboard();
   } catch (err) {
     console.error('Session error:', err);
     setGameState('error');
