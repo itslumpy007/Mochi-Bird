@@ -733,6 +733,7 @@ async function loadSession() {
     void loadLeaderboard({ force: true });
   } catch (error) {
     updateStatus(`Session error: ${error.message}`);
+    resetGame();
     setPrimaryMode('reload');
     showOverlay(
       'Session unavailable',
