@@ -36,6 +36,7 @@ async function persist() {
 function enqueuePersist() {
   writeQueue = writeQueue
     .then(persist)
+    .then(() => { cache = null; }) // Clear cache after successful persist
     .catch(err => console.warn('Leaderboard persist failed:', err.message));
 }
 
@@ -45,6 +46,7 @@ export async function recordScore({ userId, userTag, score }) {
   const bestScore = existing ? Math.max(existing.bestScore, score) : score;
   const entry    = { userId, userTag, bestScore, lastScore: score, updatedAt: new Date().toISOString() };
   board.set(userId, entry);
+  console.log(`[leaderboard] Recorded score for ${userTag}: ${score} (best: ${bestScore})`);
   enqueuePersist();
   return entry;
 }
