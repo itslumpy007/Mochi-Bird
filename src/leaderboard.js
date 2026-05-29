@@ -41,6 +41,10 @@ function enqueuePersist() {
 }
 
 export async function recordScore({ userId, userTag, score }) {
+  // Always wait for previous writes to complete, then clear cache
+  await writeQueue;
+  cache = null;
+
   const board    = await load();
   const existing = board.get(userId);
   const bestScore = existing ? Math.max(existing.bestScore, score) : score;
