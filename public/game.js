@@ -591,16 +591,18 @@ async function loadSession() {
     new Promise(resolve => setTimeout(() => { console.warn('[boot] Activity init timeout'); resolve(false); }, 10000)),
   ]);
 
-  if (!sessionId) {
-    // Practice mode
-    bestScoreKey = 'mochi-bird-best-practice';
-    setGameState('ready');
-    fetchLeaderboard();
-    return;
-  }
-
-  // Load existing session
   try {
+    if (!sessionId) {
+      // Practice mode
+      console.log('[boot] No sessionId, using practice mode');
+      bestScoreKey = 'mochi-bird-best-practice';
+      setGameState('ready');
+      fetchLeaderboard();
+      return;
+    }
+
+    // Load existing session
+    console.log('[boot] Loading session:', sessionId);
     const res = await fetch(`/api/session/${sessionId}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
@@ -618,11 +620,15 @@ async function loadSession() {
       }
     } catch {}
 
+    console.log('[boot] Session ready');
     setGameState('ready');
     fetchLeaderboard();
   } catch (err) {
-    console.error('Session error:', err);
-    setGameState('error');
+    console.error('[boot] Session load error:', err);
+    // Fallback to practice mode if anything fails
+    bestScoreKey = 'mochi-bird-best-practice';
+    setGameState('ready');
+    fetchLeaderboard();
   }
 }
 
