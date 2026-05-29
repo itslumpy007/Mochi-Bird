@@ -633,7 +633,30 @@ async function loadSession() {
 }
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
-applyLayout();
-resize();
-requestAnimationFrame(loop);
-loadSession();
+try {
+  console.log('[boot] Initializing game...');
+  applyLayout();
+  console.log('[boot] Layout applied');
+
+  resize();
+  console.log('[boot] Canvas resized to', W, 'x', H);
+
+  // Start render loop immediately
+  console.log('[boot] Starting render loop');
+  requestAnimationFrame(loop);
+
+  // Load session async
+  console.log('[boot] Loading session');
+  loadSession().catch(err => {
+    console.error('[boot] Uncaught loadSession error:', err);
+    statusEl.textContent = 'Error: ' + err.message;
+    setGameState('error');
+  });
+} catch (err) {
+  console.error('[boot] Critical boot error:', err);
+  statusEl.textContent = 'Critical Error: ' + err.message;
+  // Try to show error on canvas
+  ctx.fillStyle = '#fff';
+  ctx.font = '16px sans-serif';
+  ctx.fillText('Error: ' + err.message, 20, 40);
+}
