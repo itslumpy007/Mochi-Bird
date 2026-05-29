@@ -1,5 +1,3 @@
-import { DiscordSDK } from './vendor/discord-sdk/index.mjs';
-
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const scoreEl = document.getElementById('score');
@@ -9,7 +7,6 @@ const overlayEl = document.getElementById('overlay');
 const overlayTitleEl = document.getElementById('overlayTitle');
 const overlayTextEl = document.getElementById('overlayText');
 const sessionNoteEl = document.getElementById('sessionNote');
-const debugNoteEl = document.getElementById('debugNote');
 const stageEl = document.getElementById('stage');
 const overlaySummaryEl = document.getElementById('overlaySummary');
 const primaryButton = document.getElementById('primaryButton');
@@ -42,19 +39,10 @@ if (bootstrapEl?.textContent) {
   }
 }
 
-const discordClientId = typeof bootstrapPayload?.discordClientId === 'string'
-  ? bootstrapPayload.discordClientId.trim()
-  : '';
-
 const params = new URLSearchParams(window.location.search);
-const likelyDiscordFrame = params.has('frame_id') || params.has('instance_id') || params.has('platform');
-const likelyDiscordReferrer = typeof document.referrer === 'string'
-  && /discord(?:app)?\.com|ptb\.discord\.com|canary\.discord\.com/i.test(document.referrer);
 let sessionId = params.get('sid');
 let isPracticeMode = !sessionId;
 let session = null;
-const activityMode = Boolean(bootstrapPayload?.activityMode || likelyDiscordFrame || likelyDiscordReferrer);
-let activityBootstrapState = sessionId ? 'ready' : (activityMode ? 'pending' : 'idle');
 let bestScoreKey = 'discord-mochi-bird-best-practice';
 let canWalletKey = 'discord-mochi-bird-can-wallet-practice';
 let leaderboardCacheKey = 'discord-mochi-bird-leaderboard-cache';
@@ -73,28 +61,6 @@ let canWallet = Number(localStorage.getItem(canWalletKey) || 0);
 let runCanCount = 0;
 let lastHandledInputAt = 0;
 let lastHandledPointerId = null;
-let discordBootstrapPromise = null;
-
-if (activityMode && !sessionId) {
-  sessionNoteEl.textContent = 'Connecting to Discord...';
-}
-
-function updateDebugNote() {
-  if (!debugNoteEl) {
-    return;
-  }
-
-  const modeLabel = activityMode ? 'Activity' : 'Browser';
-  const sessionLabel = sessionId
-    ? `connected (${session?.userTag || 'pending'})`
-    : activityMode
-      ? `bootstrap ${activityBootstrapState}`
-      : 'none';
-  const saveLabel = sessionId ? 'shared' : 'local';
-  debugNoteEl.textContent = `Mode: ${modeLabel} | Session: ${sessionLabel} | Save path: ${saveLabel}`;
-}
-
-updateDebugNote();
 
 const birdSprite = new Image();
 const assetVersion = 'outfits1';
@@ -478,41 +444,6 @@ function updateWardrobeHeader() {
   }
 }
 
-function getModeStatusLabel() {
-  if (sessionId) {
-    return 'Session';
-  }
-  if (activityMode) {
-    if (activityBootstrapState === 'pending' || activityBootstrapState === 'connecting') {
-      return 'Connecting to Discord';
-    }
-    if (activityBootstrapState === 'ready') {
-      return 'Session';
-    }
-    if (activityBootstrapState === 'error') {
-      return 'Practice mode';
-    }
-    return 'Activity';
-  }
-  return 'Practice mode';
-}
-
-function getSessionNoteText() {
-  if (sessionId && session) {
-    return `Session linked to ${session.userTag}.`;
-  }
-  if (activityMode) {
-    if (activityBootstrapState === 'ready' && session) {
-      return `Session linked to ${session.userTag}.`;
-    }
-    if (activityBootstrapState === 'error') {
-      return 'Discord session is unavailable. Practice mode is still available.';
-    }
-    return 'Connecting to Discord...';
-  }
-  return 'Practice mode is available when you open this page directly.';
-}
-
 function setWardrobeMessage(text) {
   wardrobeNotice = text;
   if (wardrobeStatusEl) {
@@ -538,94 +469,6 @@ function setWardrobeOpen(open) {
   document.body.classList.toggle('wardrobe-open', open);
   if (open) {
     renderWardrobe();
-  }
-}
-
-async function bootstrapDiscordActivitySession() {
-  if (!activityMode || sessionId || discordBootstrapPromise) {
-    return discordBootstrapPromise ?? false;
-  }
-
-  if (!discordClientId) {
-    activityBootstrapState = 'error';
-    sessionNoteEl.textContent = getSessionNoteText();
-    updateStatus('Discord client id missing');
-    updateDebugNote();
-    return false;
-  }
-
-  discordBootstrapPromise = (async () => {
-    activityBootstrapState = 'connecting';
-    sessionNoteEl.textContent = getSessionNoteText();
-    updateStatus('Connecting to Discord...');
-    updateDebugNote();
-
-    const discordSdk = new DiscordSDK(discordClientId);
-    await discordSdk.ready();
-
-    const authPayload = await discordSdk.commands.authenticate({ access_token: null });
-    const discordUser = authPayload?.user;
-    if (!discordUser?.id) {
-      throw new Error('Discord user unavailable');
-    }
-
-    const channelId = discordSdk.channelId || '';
-    const guildId = discordSdk.guildId || '';
-    if (!channelId) {
-      throw new Error('Discord channel unavailable');
-    }
-
-    const userTag = discordUser.global_name?.trim()
-      || (discordUser.discriminator && discordUser.discriminator !== '0'
-        ? `${discordUser.username}#${discordUser.discriminator}`
-        : discordUser.username);
-
-    const response = await fetch('/api/mochi/activity/session', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        userId: discordUser.id,
-        userTag,
-        channelId,
-        guildId
-      })
-    });
-
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      throw new Error(payload.error || 'Failed to create activity session');
-    }
-
-    session = payload.session;
-    sessionId = session?.id || '';
-    if (!sessionId) {
-      throw new Error('Activity session was not created');
-    }
-
-    isPracticeMode = false;
-    bestScoreKey = `discord-mochi-bird-best-${session.userId}`;
-    canWalletKey = `discord-mochi-bird-can-wallet-${session.userId}`;
-    cosmeticStorageKey = getCosmeticStorageKey();
-    activityBootstrapState = 'ready';
-    sessionNoteEl.textContent = getSessionNoteText();
-    updateStatus(`Ready for ${session.userTag}`);
-    updateDebugNote();
-    profileSyncReady = true;
-    return true;
-  })();
-
-  try {
-    return await discordBootstrapPromise;
-  } catch (error) {
-    activityBootstrapState = 'error';
-    sessionNoteEl.textContent = getSessionNoteText();
-    updateStatus(`Discord bootstrap failed: ${error.message}`);
-    updateDebugNote();
-    return false;
-  } finally {
-    discordBootstrapPromise = null;
   }
 }
 
@@ -1337,11 +1180,9 @@ function pipeBoxes(pipe) {
 
 function drawSky() {
   const skyGradient = ctx.createLinearGradient(0, 0, 0, height);
-  skyGradient.addColorStop(0, '#5bbef5');
-  skyGradient.addColorStop(0.45, '#89d8fb');
-  skyGradient.addColorStop(0.75, '#c2edff');
-  skyGradient.addColorStop(0.9, '#f5dea0');
-  skyGradient.addColorStop(1, '#f0c96a');
+  skyGradient.addColorStop(0, '#78cffd');
+  skyGradient.addColorStop(0.6, '#beeefe');
+  skyGradient.addColorStop(1, '#ffe28a');
   ctx.fillStyle = skyGradient;
   ctx.fillRect(0, 0, width, height);
 }
@@ -1535,18 +1376,9 @@ function resetRun() {
   shakePower = 0;
   resetBoard();
   overlaySummaryEl.replaceChildren();
-  showOverlay(
-    'Ready to play',
-    activityMode && !sessionId
-      ? 'Connecting to Discord...'
-      : 'Tap anywhere, click, or press Space to start.'
-  );
+  showOverlay('Ready to play', 'Tap anywhere, click, or press Space to start.');
   primaryButton.textContent = 'Play';
-  updateStatus(getModeStatusLabel() === 'Practice mode'
-    ? 'Practice mode ready'
-    : activityMode && !sessionId
-      ? 'Connecting to Discord...'
-      : 'Ready to play');
+  updateStatus(isPracticeMode ? 'Practice mode ready' : 'Ready to play');
 }
 
 function startRun() {
@@ -1558,7 +1390,7 @@ function startRun() {
   gameOver = false;
   hideOverlay();
   overlaySummaryEl.replaceChildren();
-  updateStatus(getModeStatusLabel() === 'Practice mode' ? 'Practice mode running' : 'Session running');
+  updateStatus(isPracticeMode ? 'Practice mode running' : 'Session running');
   bird.velocity = FLAP_VELOCITY;
   emitParticles(bird.x, bird.y, 'rgba(255,255,255,0.45)', 5);
   playFlapSound();
@@ -1783,17 +1615,10 @@ function loop(timestamp) {
 
 async function loadSession() {
   if (!sessionId) {
-    if (activityMode && await bootstrapDiscordActivitySession()) {
-      return loadSession();
-    }
-
     isPracticeMode = true;
-    sessionNoteEl.textContent = activityMode
-      ? 'Discord session is unavailable. Practice mode is still available.'
-      : 'Practice mode: this run is local only.';
+    sessionNoteEl.textContent = 'Practice mode: this run is local only.';
     hydrateBestScore();
     switchCosmeticProfile(getCosmeticStorageKey(), false);
-    updateDebugNote();
     return;
   }
 
@@ -1808,7 +1633,7 @@ async function loadSession() {
     bestScoreKey = `discord-mochi-bird-best-${session.userId}`;
     canWalletKey = `discord-mochi-bird-can-wallet-${session.userId}`;
     cosmeticStorageKey = getCosmeticStorageKey();
-    sessionNoteEl.textContent = getSessionNoteText();
+    sessionNoteEl.textContent = `Session linked to ${session.userTag}.`;
     updateStatus(`Ready for ${session.userTag}`);
 
     const serverProfile = normalizeSharedProfile(payload.profile || null);
@@ -1833,7 +1658,6 @@ async function loadSession() {
       || localProfile.cosmeticState.selectedId !== defaultCosmetic.id;
 
     profileSyncReady = true;
-    updateDebugNote();
 
     if (hasServerProgress) {
       applySharedProfile(serverProfile);
@@ -1858,14 +1682,11 @@ async function loadSession() {
       // Best score lookup is optional.
     }
   } catch (error) {
-    sessionNoteEl.textContent = activityMode
-      ? 'Discord session is missing or expired. Practice mode is still available.'
-      : 'Discord session is missing or expired. Practice mode is still available.';
+    sessionNoteEl.textContent = 'Discord session is missing or expired. Practice mode is still available.';
     updateStatus(`Session warning: ${error.message}`);
     isPracticeMode = true;
     profileSyncReady = false;
     switchCosmeticProfile(getCosmeticStorageKey(), false);
-    updateDebugNote();
   }
 
   void loadLeaderboard({ quiet: true });
@@ -1895,15 +1716,6 @@ async function onPrimaryInput(event) {
     event.stopPropagation();
   }
   void unlockAudio();
-
-  if (activityMode && !sessionId) {
-    updateStatus('Connecting to Discord...');
-    const ready = await bootstrapDiscordActivitySession();
-    if (!ready || !sessionId) {
-      return;
-    }
-  }
-
   flap();
 }
 

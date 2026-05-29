@@ -3,10 +3,7 @@ import { createServer } from './server.js';
 import { startBot } from './bot.js';
 
 const port = Number(process.env.PORT || 3000);
-const baseUrl =
-  process.env.PUBLIC_BASE_URL ||
-  process.env.PUBLIC_BASE_URI ||
-  `http://localhost:${port}`;
+const baseUrl = process.env.PUBLIC_BASE_URL || `http://localhost:${port}`;
 const discordToken = process.env.DISCORD_TOKEN;
 const discordClientId = process.env.DISCORD_CLIENT_ID;
 const discordGuildId = process.env.DISCORD_GUILD_ID;

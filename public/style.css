@@ -287,7 +287,7 @@ body.wardrobe-open {
   aspect-ratio: 9 / 16;
   border-radius: 24px;
   overflow: hidden;
-  background: linear-gradient(180deg, #5bbef5 0%, #89d8fb 45%, #c2edff 75%, #f5dea0 90%, #f0c96a 100%);
+  background: linear-gradient(180deg, #89d5ff 0%, #c9f0ff 55%, #f6d87b 100%);
   border: 1px solid rgba(255, 255, 255, 0.18);
   touch-action: none;
   -webkit-tap-highlight-color: transparent;
@@ -405,14 +405,6 @@ canvas {
 .footer p {
   margin: 0;
   max-width: 54ch;
-}
-
-.debug-note {
-  width: 100%;
-  margin-top: -2px;
-  color: rgba(201, 240, 255, 0.82);
-  font-size: 0.84rem;
-  letter-spacing: 0.04em;
 }
 
 .ghost-button {

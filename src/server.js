@@ -19,10 +19,6 @@ const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, '..', 'public');
 const indexHtml = await readFile(path.join(publicDir, 'index.html'), 'utf8');
 
-function getPublicBaseUrl() {
-  return process.env.PUBLIC_BASE_URL || process.env.PUBLIC_BASE_URI || '';
-}
-
 function parseScore(value) {
   const score = Number(value);
   if (!Number.isFinite(score) || score < 0) {
@@ -38,7 +34,7 @@ function safeJsonForHtml(value) {
 async function renderGameHtml() {
   const bootstrap = {
     ...(await buildBootstrapPayload()),
-    publicBaseUrl: getPublicBaseUrl(),
+    publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
     activityMode: process.env.DISCORD_ACTIVITY_MODE === 'true',
     discordClientId: process.env.DISCORD_CLIENT_ID || null,
     mochiPath: '/play',
@@ -179,7 +175,7 @@ export function createServer({ onScoreSubmitted } = {}) {
     res.json({
       ok: true,
       gameTitle: 'Mochi Bird',
-      publicBaseUrl: getPublicBaseUrl(),
+      publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
       activityMode: process.env.DISCORD_ACTIVITY_MODE === 'true',
       discordClientId: process.env.DISCORD_CLIENT_ID || null,
       leaderboard: await getLeaderboard(10),
@@ -191,7 +187,7 @@ export function createServer({ onScoreSubmitted } = {}) {
     res.json({
       ok: true,
       gameTitle: 'Mochi Bird',
-      publicBaseUrl: getPublicBaseUrl(),
+      publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
       mochiPath: '/play',
       sessionTtlMinutes: Number(process.env.SESSION_TTL_MINUTES || 30),
       activityMode: process.env.DISCORD_ACTIVITY_MODE === 'true',
@@ -216,7 +212,7 @@ export function createServer({ onScoreSubmitted } = {}) {
       userTag,
       channelId,
       guildId,
-      baseUrl: getPublicBaseUrl()
+      baseUrl: process.env.PUBLIC_BASE_URL || ''
     });
 
     res.json({
