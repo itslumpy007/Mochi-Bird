@@ -547,6 +547,7 @@ function drawGround() {
 }
 
 function drawBird() {
+  if (!bird) return;
   const tilt = clamp(bird.velocity / 400, -0.6, 0.8);
   ctx.save();
   ctx.translate(bird.x, bird.y);

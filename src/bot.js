@@ -6,6 +6,7 @@ import {
   EmbedBuilder,
   Events,
   GatewayIntentBits,
+  MessageFlags,
   REST,
   Routes,
   SlashCommandBuilder
@@ -65,71 +66,75 @@ export async function startBot({
       return;
     }
 
-    if (interaction.commandName === 'mochi' || interaction.commandName === 'flappy') {
-      if (activityMode) {
-        const response = await fetch(
-          `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              type: 12
-            })
+    try {
+      if (interaction.commandName === 'mochi' || interaction.commandName === 'flappy') {
+        if (activityMode) {
+          const response = await fetch(
+            `https://discord.com/api/v10/interactions/${interaction.id}/${interaction.token}/callback`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                type: 12
+              })
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error(`Failed to launch activity: ${response.status}`);
           }
+          return;
+        }
+
+        const session = createSession({
+          userId: interaction.user.id,
+          userTag: interaction.user.tag,
+          channelId: interaction.channelId,
+          guildId: interaction.guildId,
+          baseUrl
+        });
+
+        const playUrl = buildPlayUrl(baseUrl, session.id);
+        const embed = new EmbedBuilder()
+          .setTitle('Mochi Bird')
+          .setDescription('Your run is ready. Tap the button to open the game in a browser.')
+          .addFields(
+            { name: 'Player', value: interaction.user.tag, inline: true },
+            { name: 'Session', value: session.id.slice(0, 8), inline: true }
+          )
+          .setColor(0x25d0ab);
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('Play')
+            .setStyle(ButtonStyle.Link)
+            .setURL(playUrl)
         );
 
-        if (!response.ok) {
-          throw new Error(`Failed to launch activity: ${response.status}`);
-        }
+        await interaction.reply({
+          flags: MessageFlags.Ephemeral,
+          embeds: [embed],
+          components: [row]
+        });
         return;
       }
 
-      const session = createSession({
-        userId: interaction.user.id,
-        userTag: interaction.user.tag,
-        channelId: interaction.channelId,
-        guildId: interaction.guildId,
-        baseUrl
-      });
-
-      const playUrl = buildPlayUrl(baseUrl, session.id);
-      const embed = new EmbedBuilder()
-        .setTitle('Mochi Bird')
-        .setDescription('Your run is ready. Tap the button to open the game in a browser.')
-        .addFields(
-          { name: 'Player', value: interaction.user.tag, inline: true },
-          { name: 'Session', value: session.id.slice(0, 8), inline: true }
-        )
-        .setColor(0x25d0ab);
-
-      const row = new ActionRowBuilder().addComponents(
-        new ButtonBuilder()
-          .setLabel('Play')
-          .setStyle(ButtonStyle.Link)
-          .setURL(playUrl)
-      );
-
-      await interaction.reply({
-        ephemeral: true,
-        embeds: [embed],
-        components: [row]
-      });
-      return;
-    }
-
-    if (interaction.commandName === 'leaderboard') {
-      const entries = await getLeaderboard(10);
-      await interaction.reply({
-        ephemeral: true,
-        embeds: [
-          new EmbedBuilder()
-            .setTitle('Mochi Bird Leaderboard')
-            .setDescription(formatLeaderboard(entries))
-            .setColor(0xffc857)
-        ]
-      });
+      if (interaction.commandName === 'leaderboard') {
+        const entries = await getLeaderboard(10);
+        await interaction.reply({
+          flags: MessageFlags.Ephemeral,
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('Mochi Bird Leaderboard')
+              .setDescription(formatLeaderboard(entries))
+              .setColor(0xffc857)
+          ]
+        });
+      }
+    } catch (error) {
+      console.error(`Interaction error [${interaction.commandName}]:`, error.message);
     }
   });
 
