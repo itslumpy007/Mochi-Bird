@@ -495,17 +495,68 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-// ── Session loading ────────────────────────────────────────────────────────────
+// ── Discord Activity support ──────────────────────────────────────────────────
+let discordSdk = null;
+
+async function tryInitDiscordActivity() {
+  try {
+    // Try to load Discord SDK
+    const sdkModule = await import('https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk/+esm');
+    const clientId = (await fetch('/api/config').then(r => r.json())).discordClientId;
+
+    if (!clientId) return false;
+
+    discordSdk = new sdkModule.DiscordSDK(clientId);
+    await discordSdk.ready();
+
+    // We're in a Discord Activity iframe — create a session
+    const participants = await discordSdk.commands.getInstanceConnectedParticipants();
+    const participant = participants?.[0];
+    if (!participant?.user?.id) throw new Error('No activity participant');
+
+    const channel = await discordSdk.commands.getChannel({ channel_id: discordSdk.channelId });
+
+    const res = await fetch('/api/activity/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: participant.user.id,
+        userTag: participant.user.username,
+        channelId: discordSdk.channelId,
+        guildId: channel?.guild_id || '',
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+
+    sessionId = data.session.id;
+    sessionData = data.session;
+    isPractice = false;
+    bestScoreKey = `mochi-bird-best-${sessionData.userId}`;
+
+    return true;
+  } catch (err) {
+    console.log('Discord Activity not available:', err.message);
+    return false;
+  }
+}
+
 async function loadSession() {
   resetGame();
 
-  if (isPractice) {
+  // Try Discord Activity first
+  const isActivity = await tryInitDiscordActivity();
+
+  if (!sessionId) {
+    // Practice mode
     bestScoreKey = 'mochi-bird-best-practice';
     setGameState('ready');
     fetchLeaderboard();
     return;
   }
 
+  // Load existing session
   try {
     const res = await fetch(`/api/session/${sessionId}`);
     const data = await res.json();
