@@ -270,8 +270,19 @@ function flap() {
 }
 
 startBtn.addEventListener('click', () => {
-  if (overlayMode === 'reload') { location.reload(); return; }
-  if (dead && isPractice)       { resetGame(); showOverlay('Practice mode', 'Click Play to go again.', 'Play'); enableStart('Play'); return; }
+  // Reload page if session expired
+  if (overlayMode === 'reload') {
+    location.reload();
+    return;
+  }
+
+  // Reset game in practice mode before starting next run
+  if (dead && isPractice) {
+    resetGame();
+    hideOverlay();
+  }
+
+  // Flap to start or continue
   flap();
 });
 
