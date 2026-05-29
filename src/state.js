@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-const TTL_MS   = Number(process.env.SESSION_TTL_MINUTES || 30) * 60 * 1000;
+const TTL_MS   = Number(process.env.SESSION_TTL_MINUTES || 240) * 60 * 1000; // 4 hours by default
 const sessions = new Map();
 
 function now() { return Date.now(); }
