@@ -89,7 +89,7 @@ let lbEntries = [];
 let bestScoreKey = 'mochi-bird-best-practice';
 
 const sprite = new Image();
-sprite.src = '/assets/avatar.png';
+sprite.src = '/assets/avatar-v3.png';
 
 // ── State machine ──────────────────────────────────────────────────────────────
 function setGameState(state) {
