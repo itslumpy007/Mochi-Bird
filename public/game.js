@@ -120,6 +120,9 @@ let clouds = [];
 let stars = [];
 let bgOffset = 0, spawnTimer = 0, elapsedMs = 0, score = 0, bestScore = 0;
 let buildings = [];
+let startupProgress = 0;    // 0→1 loading bar
+let startupReady    = false; // session finished loading
+let pendingReady    = false; // waiting for bar to finish before showing ready
 let cans = [], sessionCans = 0, lifetimeCans = 0;
 let lastFlapTime = -Infinity;
 
@@ -147,9 +150,10 @@ function setGameState(state) {
 function updateUI() {
   switch (gameState) {
     case 'loading':
-      showOverlay('Mochi Bird', 'Loading…');
+      hideOverlay();   // canvas draws the startup screen
       statusEl.textContent = 'Loading...';
       startBtn.disabled = true;
+      shopBtnEl.disabled = true;
       break;
 
     case 'ready':
@@ -358,9 +362,29 @@ async function submitScore() {
 }
 
 function update(dt) {
-  if (gameState !== 'playing') return;
+  elapsedMs += dt * 1000; // always tick so sparkles animate on startup screen
 
-  elapsedMs += dt * 1000;
+  if (gameState === 'loading') {
+    // Drive bar: fast until 85%, then wait for session; snap to 100% when done
+    const target = startupReady ? 1 : 0.85;
+    startupProgress += (target - startupProgress) * dt * (startupReady ? 4 : 1.2);
+    startupProgress = Math.min(startupProgress, target);
+    if (pendingReady && startupProgress >= 0.99) {
+      pendingReady = false;
+      setGameState('ready');
+      return;
+    }
+    // Drift clouds slowly during startup
+    for (const c of clouds) {
+      c.x -= c.speed * 0.004;
+      if (c.x < -140) c.x = W + 140;
+    }
+    return;
+  }
+
+  if (gameState !== 'playing') return;
+  // (elapsedMs already incremented above)
+
   bird.vy += GRAVITY * dt;
   bird.y += bird.vy * dt;
   bgOffset = (bgOffset + PIPE_SPEED * dt) % W;
@@ -845,6 +869,118 @@ function roundRect(x, y, w, h, r) {
   ctx.fill();
 }
 
+// ── Startup screen ─────────────────────────────────────────────────────────────
+function drawStartupScreen() {
+  // Sky + sparkles
+  drawSky();
+  drawBuildings();
+
+  // Decorative pipes (static, flanking the scene)
+  drawPipe(W * 0.04,        0, PIPE_W, H * 0.30, true);
+  drawPipe(W - PIPE_W - W * 0.04, 0, PIPE_W, H * 0.22, true);
+  drawPipe(W * 0.07,        H * 0.60, PIPE_W, H - GROUND_H - H * 0.60, false);
+  drawPipe(W - PIPE_W - W * 0.07, H * 0.58, PIPE_W, H - GROUND_H - H * 0.58, false);
+
+  // Clouds (already drifting)
+  drawClouds();
+
+  // Subtle rainbow arc
+  ctx.save();
+  ctx.strokeStyle = 'rgba(220,180,255,0.30)';
+  ctx.lineWidth   = 28;
+  ctx.beginPath();
+  ctx.arc(W / 2, H * 0.72, W * 0.38, Math.PI, 0);
+  ctx.stroke();
+  ctx.restore();
+
+  // Ground
+  drawGround();
+
+  // ── Title ──────────────────────────────────────────────────────────────────
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  const fs1 = clamp(W * 0.13, 28, 58);
+  const titleY = H * 0.24;
+
+  // "MOCHI" line
+  ctx.font        = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#b03070';
+  ctx.lineWidth   = 8;
+  ctx.lineJoin    = 'round';
+  ctx.strokeText('MOCHI', W / 2, titleY - fs1 * 0.6);
+  ctx.fillStyle   = '#fff';
+  ctx.fillText   ('MOCHI', W / 2, titleY - fs1 * 0.6);
+
+  // "BIRD" line
+  const fs2 = clamp(W * 0.165, 34, 72);
+  ctx.font        = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#b03070';
+  ctx.lineWidth   = 10;
+  ctx.strokeText('BIRD', W / 2, titleY + fs2 * 0.55);
+  ctx.fillStyle   = '#fff';
+  ctx.fillText   ('BIRD', W / 2, titleY + fs2 * 0.55);
+
+  // Pink tint pass
+  ctx.fillStyle = 'rgba(255,160,200,0.22)';
+  ctx.font = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.fillText('MOCHI', W / 2, titleY - fs1 * 0.6);
+  ctx.font = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.fillText('BIRD',  W / 2, titleY + fs2 * 0.55);
+
+  // Hearts flanking title
+  drawHeart(W / 2 - fs2 * 1.05, titleY + fs2 * 0.55, 6, '#ff6eb4');
+  drawHeart(W / 2 + fs2 * 1.05, titleY + fs2 * 0.55, 6, '#ff6eb4');
+
+  // Floating hearts scattered
+  const t = elapsedMs / 1000;
+  [[0.2, 0.38], [0.78, 0.30], [0.88, 0.52], [0.14, 0.55]].forEach(([rx, ry], i) => {
+    const fy = H * ry - Math.sin(t * 0.9 + i * 1.4) * 7;
+    drawHeart(W * rx, fy, 4 + (i % 2) * 2, 'rgba(255,120,180,0.65)');
+  });
+
+  // ── Loading bar ────────────────────────────────────────────────────────────
+  const barW = W * 0.62, barH = 20;
+  const barX = W / 2 - barW / 2;
+  const barY = H * 0.74;
+
+  // "LOADING..." label
+  ctx.font        = `800 ${clamp(W * 0.048, 12, 18)}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+  ctx.lineWidth   = 4;
+  ctx.strokeText('LOADING...', W / 2, barY - 16);
+  ctx.fillStyle   = '#c04080';
+  ctx.fillText   ('LOADING...', W / 2, barY - 16);
+
+  // Track
+  ctx.fillStyle = 'rgba(255,255,255,0.28)';
+  roundRect(barX, barY, barW, barH, barH / 2); // fills
+  ctx.strokeStyle = '#ff6eb4';
+  ctx.lineWidth   = 2;
+  ctx.stroke();
+
+  // Fill
+  const fillW = Math.max(barH, (barW - 4) * startupProgress);
+  const fg = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+  fg.addColorStop(0, '#ffaad0');
+  fg.addColorStop(1, '#ff5da0');
+  ctx.fillStyle = fg;
+  // Clip fill inside track
+  ctx.save();
+  ctx.beginPath();
+  const r2 = (barH - 4) / 2;
+  ctx.roundRect
+    ? ctx.roundRect(barX + 2, barY + 2, fillW, barH - 4, r2)
+    : (roundRect(barX + 2, barY + 2, fillW, barH - 4, r2), ctx.restore(), ctx.save());
+  ctx.fill();
+  ctx.restore();
+
+  // Heart at fill tip
+  if (startupProgress > 0.05) {
+    drawHeart(barX + 2 + fillW - 4, barY + barH / 2, 5, '#fff');
+  }
+}
+
+// ── Render loop ────────────────────────────────────────────────────────────────
 let lastTs = 0;
 function loop(ts) {
   const dt = Math.min(0.033, lastTs ? (ts - lastTs) / 1000 : 0);
@@ -853,19 +989,30 @@ function loop(ts) {
   update(dt);
 
   ctx.clearRect(0, 0, W, H);
-  drawSky();
-  drawBuildings();
-  drawClouds();
-  drawPipes();
-  drawGround();
-  drawCans();
-  drawBird();
-  drawDim();
+
+  if (gameState === 'loading') {
+    drawStartupScreen();
+  } else {
+    drawSky();
+    drawBuildings();
+    drawClouds();
+    drawPipes();
+    drawGround();
+    drawCans();
+    drawBird();
+    drawDim();
+  }
 
   requestAnimationFrame(loop);
 }
 
 // ── No Discord SDK needed - bot passes sessionId via URL parameter ──────────
+
+function signalReady() {
+  startupReady  = true;
+  pendingReady  = true;
+  // setGameState('ready') fires from update() once bar reaches 1
+}
 
 async function loadSession() {
   resetGame();
@@ -915,17 +1062,13 @@ async function loadSession() {
             console.log('[boot] Could not load Discord user session:', err2.message);
             console.log('[boot] Using practice mode');
             bestScoreKey = 'mochi-bird-best-practice';
-            setGameState('ready');
-            fetchLeaderboard();
-            return;
+            signalReady(); fetchLeaderboard(); return;
           }
         } else {
           // No user ID and no session params = practice mode
           console.log('[boot] No session found - using practice mode');
           bestScoreKey = 'mochi-bird-best-practice';
-          setGameState('ready');
-          fetchLeaderboard();
-          return;
+          signalReady(); fetchLeaderboard(); return;
         }
       }
     } else {
@@ -958,14 +1101,11 @@ async function loadSession() {
     } catch {}
 
     console.log('[boot] Session ready');
-    setGameState('ready');
-    fetchLeaderboard();
+    signalReady(); fetchLeaderboard();
   } catch (err) {
     console.error('[boot] Session load error:', err);
-    // Fallback to practice mode if anything fails
     bestScoreKey = 'mochi-bird-best-practice';
-    setGameState('ready');
-    fetchLeaderboard();
+    signalReady(); fetchLeaderboard();
   }
 }
 
