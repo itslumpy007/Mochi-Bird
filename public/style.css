@@ -235,6 +235,8 @@ canvas {
   place-items: center;
   background: linear-gradient(180deg, rgba(7,16,24,.06), rgba(7,16,24,.54));
   transition: opacity .18s ease;
+  pointer-events: auto;
+  z-index: 10;
 }
 
 .overlay.hidden {
@@ -276,9 +278,12 @@ button {
   font-size: .96rem;
   padding: 11px 22px;
   min-width: 130px;
+  min-height: 44px;
   cursor: pointer;
   box-shadow: 0 10px 28px rgba(37,208,171,.28);
   transition: filter .15s;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 button:hover:not(:disabled) { filter: brightness(1.07); }
 button:disabled { opacity: .42; cursor: not-allowed; }
