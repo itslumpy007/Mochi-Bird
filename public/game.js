@@ -729,7 +729,7 @@ function resetGame() {
   score = 0;
   elapsedMs = 0;
   bgOffset = 0;
-  spawnTimer = 0.65;
+  spawnTimer = 0.65 / diffMult();
   pipes = [];
 
   bird.x = W * 0.28;
@@ -1026,7 +1026,7 @@ function update(dt) {
 
   // Pipes
   spawnTimer -= dt;
-  if (spawnTimer <= 0) { addPipe(); spawnTimer = PIPE_INTERVAL; }
+  if (spawnTimer <= 0) { addPipe(); spawnTimer = PIPE_INTERVAL / diffMult(); }
 
   const bb = birdBox();
   for (const p of pipes) {
