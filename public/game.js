@@ -31,14 +31,62 @@ const GROUND_H      = 90;
 const CAN_R         = 9;
 
 // ── Skins ──────────────────────────────────────────────────────────────────────
-const SKINS = [
-  { id: 'default', name: 'Classic', price: 0,   body: '#ffd84d', wing: '#ffb31f', beak: '#f27d2f', eye: '#1a2230' },
-  { id: 'ocean',   name: 'Ocean',   price: 60,  body: '#4dc8ff', wing: '#1fa8f5', beak: '#ff8c42', eye: '#0d1a2e' },
-  { id: 'cherry',  name: 'Cherry',  price: 120, body: '#ff4d6d', wing: '#e0193a', beak: '#ffd84d', eye: '#1a0d12' },
-  { id: 'neon',    name: 'Neon',    price: 200, body: '#39ff8a', wing: '#20e070', beak: '#ff39d4', eye: '#001a0d' },
-  { id: 'void',    name: 'Void',    price: 350, body: '#8b6fff', wing: '#6b4fff', beak: '#ff9f4d', eye: '#0d0a1a' },
-  { id: 'solar',   name: 'Solar',   price: 500, body: '#ff8c42', wing: '#e06020', beak: '#ffd84d', eye: '#1a0d00' },
+function makeSkin(id, name, price, src) {
+  const img = new Image();
+  img.src = src;
+  return { id, name, price, src, img };
+}
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+const SKIN_GROUPS = [
+  {
+    label: 'Default',
+    skins: [ makeSkin('default', 'Default', 0, '/assets/avatar-v2.png') ],
+  },
+  {
+    label: 'Dr. Shelly',
+    skins: Array.from({ length: 10 }, (_, i) =>
+      makeSkin(`dr-shelly-${pad(i+1)}`, `Pose ${i+1}`, i === 0 ? 60 : 25, `/assets/cosmetics/dr-shelly-${pad(i+1)}.png`)
+    ),
+  },
+  {
+    label: 'Shelly Zero',
+    skins: Array.from({ length: 12 }, (_, i) =>
+      makeSkin(`dr-shelly-s2-${pad(i+1)}`, `Pose ${i+1}`, i === 0 ? 80 : 30, `/assets/cosmetics/dr-shelly-set-2-${pad(i+1)}.png`)
+    ),
+  },
+  {
+    label: 'Shalani Energy',
+    skins: Array.from({ length: 8 }, (_, i) =>
+      makeSkin(`shalani-${pad(i+1)}`, `Pose ${i+1}`, i === 0 ? 70 : 25, `/assets/cosmetics/shalani-energy-${pad(i+1)}.png`)
+    ),
+  },
+  {
+    label: 'Sussballs',
+    skins: Array.from({ length: 7 }, (_, i) =>
+      makeSkin(`sussballs-${pad(i+1)}`, `Pose ${i+1}`, i === 0 ? 90 : 35, `/assets/cosmetics/sussballs-${pad(i+1)}.png`)
+    ),
+  },
+  {
+    label: 'Watermelon',
+    skins: [ makeSkin('watermelon-01', 'Watermelon', 150, '/assets/cosmetics/watermelon-01.png') ],
+  },
+  {
+    label: 'Dark Hair',
+    skins: Array.from({ length: 16 }, (_, i) =>
+      makeSkin(`hair-dark-${pad(i+1)}`, `Style ${i+1}`, i === 0 ? 20 : 10, `/assets/cosmetics/hair-dark-${pad(i+1)}.png`)
+    ),
+  },
+  {
+    label: 'Brown Hair',
+    skins: Array.from({ length: 16 }, (_, i) =>
+      makeSkin(`hair-brown-${pad(i+1)}`, `Style ${i+1}`, i === 0 ? 20 : 10, `/assets/cosmetics/hair-brown-${pad(i+1)}.png`)
+    ),
+  },
 ];
+
+const SKINS = SKIN_GROUPS.flatMap(g => g.skins);
 
 let ownedSkins    = new Set(JSON.parse(localStorage.getItem('mochi-bird-owned') || '["default"]'));
 let equippedSkinId = localStorage.getItem('mochi-bird-skin') || 'default';
@@ -87,9 +135,6 @@ let isPractice = !sessionId && !sessionToken;
 let sessionData = null;
 let lbEntries = [];
 let bestScoreKey = 'mochi-bird-best-practice';
-
-const sprite = new Image();
-sprite.src = '/assets/avatar-v3.png';
 
 // ── State machine ──────────────────────────────────────────────────────────────
 function setGameState(state) {
@@ -394,87 +439,82 @@ function closeStore() {
 
 function drawSkinPreview(canvas, skin) {
   const c = canvas.getContext('2d');
-  const r = canvas.width / 2;
-  c.clearRect(0, 0, canvas.width, canvas.height);
+  const w = canvas.width, h = canvas.height;
+  c.clearRect(0, 0, w, h);
+  const img = skin.img;
+  if (img && img.complete && img.naturalWidth > 0) {
+    const aspect = img.naturalWidth / img.naturalHeight;
+    let dw = w, dh = w / aspect;
+    if (dh > h) { dh = h; dw = h * aspect; }
+    c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  } else {
+    // retry once image loads
+    img.onload = () => drawSkinPreview(canvas, skin);
+    c.fillStyle = 'rgba(255,255,255,.06)';
+    c.beginPath();
+    c.arc(w / 2, h / 2, w / 2 - 4, 0, Math.PI * 2);
+    c.fill();
+  }
+}
 
-  // Body
-  c.fillStyle = skin.body;
-  c.beginPath();
-  c.arc(r, r, r - 2, 0, Math.PI * 2);
-  c.fill();
+function makeSkinCard(skin) {
+  const owned    = ownedSkins.has(skin.id);
+  const equipped = skin.id === equippedSkinId;
+  const canAfford = lifetimeCans >= skin.price;
 
-  // Wing
-  c.fillStyle = skin.wing;
-  c.beginPath();
-  c.ellipse(r - 4, r + 6, 13, 9, -0.3, 0, Math.PI * 2);
-  c.fill();
+  const card = document.createElement('div');
+  card.className = 'skin-card' + (equipped ? ' equipped' : '');
 
-  // Eye
-  c.fillStyle = skin.eye;
-  c.beginPath();
-  c.arc(r + 8, r - 6, 3.5, 0, Math.PI * 2);
-  c.fill();
-  c.fillStyle = '#fff';
-  c.beginPath();
-  c.arc(r + 9, r - 7, 1.2, 0, Math.PI * 2);
-  c.fill();
+  const previewCanvas = document.createElement('canvas');
+  previewCanvas.width  = 80;
+  previewCanvas.height = 100;
+  previewCanvas.className = 'skin-preview';
 
-  // Beak
-  c.fillStyle = skin.beak;
-  c.beginPath();
-  c.moveTo(r + 16, r - 2);
-  c.lineTo(r + 28, r + 4);
-  c.lineTo(r + 16, r + 10);
-  c.closePath();
-  c.fill();
+  const nameEl = document.createElement('div');
+  nameEl.className = 'skin-name';
+  nameEl.textContent = skin.name;
+
+  let btnClass = 'skin-action';
+  let btnText, btnDisabled;
+  if (equipped) {
+    btnClass += ' active'; btnText = 'Equipped'; btnDisabled = true;
+  } else if (owned) {
+    btnClass += ' owned'; btnText = 'Equip'; btnDisabled = false;
+  } else if (canAfford) {
+    btnText = `Buy · ${skin.price} 🥫`; btnDisabled = false;
+  } else {
+    btnText = `${skin.price} 🥫`; btnDisabled = true;
+  }
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = btnClass;
+  btn.textContent = btnText;
+  btn.disabled = btnDisabled;
+  btn.addEventListener('click', () => handleSkinAction(skin.id));
+
+  card.appendChild(previewCanvas);
+  card.appendChild(nameEl);
+  card.appendChild(btn);
+
+  drawSkinPreview(previewCanvas, skin);
+  return card;
 }
 
 function renderStore() {
   storeBalanceEl.textContent = lifetimeCans;
   skinGridEl.innerHTML = '';
 
-  for (const skin of SKINS) {
-    const owned    = ownedSkins.has(skin.id);
-    const equipped = skin.id === equippedSkinId;
-    const canAfford = lifetimeCans >= skin.price;
+  for (const group of SKIN_GROUPS) {
+    const heading = document.createElement('h3');
+    heading.className = 'skin-group-label';
+    heading.textContent = group.label;
+    skinGridEl.appendChild(heading);
 
-    const card = document.createElement('div');
-    card.className = 'skin-card' + (equipped ? ' equipped' : '');
-
-    const previewCanvas = document.createElement('canvas');
-    previewCanvas.width  = 72;
-    previewCanvas.height = 72;
-    previewCanvas.className = 'skin-preview';
-
-    let btnClass = 'skin-action';
-    let btnText, btnDisabled;
-    if (equipped) {
-      btnClass += ' active'; btnText = 'Equipped'; btnDisabled = true;
-    } else if (owned) {
-      btnClass += ' owned'; btnText = 'Equip'; btnDisabled = false;
-    } else if (canAfford) {
-      btnText = `Buy · ${skin.price} 🥫`; btnDisabled = false;
-    } else {
-      btnText = `${skin.price} 🥫`; btnDisabled = true;
-    }
-
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = btnClass;
-    btn.textContent = btnText;
-    btn.disabled = btnDisabled;
-    btn.addEventListener('click', () => handleSkinAction(skin.id));
-
-    const nameEl = document.createElement('div');
-    nameEl.className = 'skin-name';
-    nameEl.textContent = skin.name;
-
-    card.appendChild(previewCanvas);
-    card.appendChild(nameEl);
-    card.appendChild(btn);
-    skinGridEl.appendChild(card);
-
-    drawSkinPreview(previewCanvas, skin);
+    const grid = document.createElement('div');
+    grid.className = 'skin-group-grid';
+    for (const skin of group.skins) grid.appendChild(makeSkinCard(skin));
+    skinGridEl.appendChild(grid);
   }
 }
 
@@ -620,42 +660,21 @@ function drawBird() {
   ctx.translate(bird.x, bird.y);
   ctx.rotate(tilt);
 
-  // Base circle
-  ctx.fillStyle = currentSkin.body;
-  ctx.beginPath();
-  ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Wing
-  ctx.fillStyle = currentSkin.wing;
-  ctx.beginPath();
-  ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Eye
-  ctx.fillStyle = currentSkin.eye;
-  ctx.beginPath();
-  ctx.arc(5, -4, 2.1, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Beak
-  ctx.fillStyle = currentSkin.beak;
-  ctx.beginPath();
-  ctx.moveTo(11, -1);
-  ctx.lineTo(20, 3);
-  ctx.lineTo(11, 7);
-  ctx.closePath();
-  ctx.fill();
-
-  // Sprite on top
-  if (sprite.complete && sprite.naturalWidth > 0) {
-    ctx.save();
+  const img = currentSkin.img;
+  if (img && img.complete && img.naturalWidth > 0) {
+    const displayH = bird.r * 5;
+    const displayW = displayH * (img.naturalWidth / img.naturalHeight);
+    ctx.drawImage(img, -displayW / 2, -displayH * 0.52, displayW, displayH);
+  } else {
+    // Geometric fallback while image loads
+    ctx.fillStyle = '#ffd84d';
     ctx.beginPath();
     ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
-    ctx.clip();
-    const s = bird.r * 2;
-    ctx.drawImage(sprite, -bird.r, -bird.r, s, s);
-    ctx.restore();
+    ctx.fill();
+    ctx.fillStyle = '#ffb31f';
+    ctx.beginPath();
+    ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
