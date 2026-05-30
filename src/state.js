@@ -30,8 +30,8 @@ export function createSession({ userId, userTag, channelId, guildId = '', baseUr
   sessions.set(id, session);
   // Store latest session for this user
   userSessions.set(userId, id);
-  // Track most recent session for Activity auto-linking (expires in 30 seconds)
-  lastCreatedSession = { session, expiresAt: createdAt + 30000 };
+  // Track most recent session for Activity auto-linking (expires in 5 minutes)
+  lastCreatedSession = { session, expiresAt: createdAt + 300000 };
   return session;
 }
 
