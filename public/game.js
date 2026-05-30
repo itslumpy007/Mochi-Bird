@@ -351,7 +351,7 @@ function renderChallengesModal() {
 
 // ── Can sprite ─────────────────────────────────────────────────────────────────
 const canSprite = new Image();
-canSprite.src = '/assets/dr-pepper-can.png';
+canSprite.src = '/assets/dr-pepper-can-v2.png';
 
 // ── Per-run stats ──────────────────────────────────────────────────────────────
 let runCans = 0;
