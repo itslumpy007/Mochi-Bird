@@ -61,6 +61,14 @@ function makeSkin(id, name, price, src) {
   return { id, name, price, src, img };
 }
 
+// Sprite-sheet skin (shares one loaded image, uses sx/sy crop)
+const bobaSheet = new Image();
+bobaSheet.src = '/assets/cosmetics/image-1780163497426.webp';
+
+function makeSheetSkin(id, name, price, col, row) {
+  return { id, name, price, src: null, img: null, sheet: bobaSheet, col, row, sheetCols: 4, sheetRows: 2 };
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 
 const SKIN_GROUPS = [
@@ -115,6 +123,20 @@ const SKIN_GROUPS = [
     skins: Array.from({ length: 16 }, (_, i) =>
       makeSkin(`hair-brown-${pad(i+1)}`, `Style ${i+1}`, i === 0 ? 20 : 10, `/assets/cosmetics/hair-brown-${pad(i+1)}.png`)
     ),
+  },
+  {
+    label: 'Boba Tea',
+    desc: 'Sipping in style 🧋',
+    skins: [
+      makeSheetSkin('boba-classic',    'Classic Milk Tea',   100, 0, 0),
+      makeSheetSkin('boba-matcha',     'Matcha Milk Tea',    120, 1, 0),
+      makeSheetSkin('boba-taro',       'Taro Milk Tea',      130, 2, 0),
+      makeSheetSkin('boba-thai',       'Thai Milk Tea',      120, 3, 0),
+      makeSheetSkin('boba-strawberry', 'Strawberry Milk',    110, 0, 1),
+      makeSheetSkin('boba-brownsugar', 'Brown Sugar',        140, 1, 1),
+      makeSheetSkin('boba-mango',      'Mango Milk',         110, 2, 1),
+      makeSheetSkin('boba-cookies',    'Cookies & Cream',    150, 3, 1),
+    ],
   },
 ];
 
@@ -1140,11 +1162,32 @@ function makeSkinCard(skin) {
   const card = document.createElement('div');
   card.className = 'skin-card' + (equipped ? ' equipped' : '');
 
-  const previewImg = document.createElement('img');
+  let previewImg;
+  if (skin.sheet) {
+    // Sheet skin — draw the correct cell onto a canvas preview
+    previewImg = document.createElement('canvas');
+    previewImg.width  = 80;
+    previewImg.height = 100;
+    previewImg.className = 'skin-preview';
+    const drawCell = () => {
+      if (!skin.sheet.complete || !skin.sheet.naturalWidth) { skin.sheet.addEventListener('load', drawCell, { once: true }); return; }
+      const c  = previewImg.getContext('2d');
+      const sw = skin.sheet.naturalWidth  / skin.sheetCols;
+      const sh = skin.sheet.naturalHeight / skin.sheetRows;
+      const sx = skin.col * sw, sy = skin.row * sh;
+      const scale = Math.min(80 / sw, 100 / sh);
+      const dw = sw * scale, dh = sh * scale;
+      c.clearRect(0, 0, 80, 100);
+      c.drawImage(skin.sheet, sx, sy, sw, sh, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
+    };
+    drawCell();
+  } else {
+    previewImg = document.createElement('img');
+    previewImg.src     = skin.src;
+    previewImg.alt     = skin.name;
+    previewImg.loading = 'lazy';
+  }
   previewImg.className = 'skin-preview';
-  previewImg.src = skin.src;
-  previewImg.alt = skin.name;
-  previewImg.loading = 'lazy';
 
   const nameEl = document.createElement('div');
   nameEl.className = 'skin-name';
@@ -1198,6 +1241,7 @@ function groupMatchesFilter(group) {
   if (storeFilter === 'sussballs') return lbl.startsWith('sussballs');
   if (storeFilter === 'watermelon') return lbl.startsWith('watermelon');
   if (storeFilter === 'hair') return lbl.includes('hair');
+  if (storeFilter === 'boba') return lbl.startsWith('boba');
   return true;
 }
 
@@ -1761,17 +1805,28 @@ function drawBird(overrideY, overrideTilt) {
   }
 
   const displaySkin = (animSkinList.length > 1) ? animSkinList[animFrame] : currentSkin;
+  const clipR   = bird.r * 2.3;
+  const displayH = bird.r * 5.2;
+
   const img = displaySkin?.img || currentSkin.img;
   if (img && img.complete && img.naturalWidth > 0) {
-    const displayH = bird.r * 5.2;
+    // Regular sprite
     const displayW = displayH * (img.naturalWidth / img.naturalHeight);
-    // Circle-clip so any white/opaque background in the sprite is hidden
-    const clipR = bird.r * 2.3;
     ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, clipR, 0, Math.PI * 2);
-    ctx.clip();
+    ctx.beginPath(); ctx.arc(0, 0, clipR, 0, Math.PI * 2); ctx.clip();
     ctx.drawImage(img, -displayW / 2, -displayH * 0.48, displayW, displayH);
+    ctx.restore();
+  } else if (displaySkin?.sheet?.complete && displaySkin.sheet.naturalWidth > 0) {
+    // Sprite-sheet skin (boba tea etc.)
+    const sheet = displaySkin.sheet;
+    const sw = sheet.naturalWidth  / displaySkin.sheetCols;
+    const sh = sheet.naturalHeight / displaySkin.sheetRows;
+    const sx = displaySkin.col * sw;
+    const sy = displaySkin.row * sh;
+    const displayW = displayH * (sw / sh);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(0, 0, clipR, 0, Math.PI * 2); ctx.clip();
+    ctx.drawImage(sheet, sx, sy, sw, sh, -displayW / 2, -displayH * 0.48, displayW, displayH);
     ctx.restore();
   } else {
     ctx.fillStyle = '#ffd84d';
