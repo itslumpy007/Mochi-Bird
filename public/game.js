@@ -203,6 +203,13 @@ function triggerShake(amt) { shakeAmt = amt; }
 let lavaGeyserTimer     = 0;
 let lavaGeyserParticles = [];
 
+// ── Fireballs (Hell Mode) ──────────────────────────────────────────────────────
+let fireballs       = [];
+let fireballTimer   = 0;
+let hellHealth      = 3;   // hearts remaining
+const HELL_MAX_HP   = 3;
+let hellInvincible  = 0;   // invincibility frames after a hit (seconds)
+
 function spawnLavaGeyser() {
   const x      = W * (0.05 + Math.random() * 0.9);
   const groundY = H - GROUND_H;
@@ -809,7 +816,11 @@ function resetGame() {
 
   cans = [];
   lavaGeyserParticles = [];
-  lavaGeyserTimer = 0.5;
+  lavaGeyserTimer  = 0.5;
+  fireballs        = [];
+  fireballTimer    = 2.0;
+  hellHealth       = HELL_MAX_HP;
+  hellInvincible   = 0;
   sessionCans = 0;
   lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
   canCountEl.textContent = String(lifetimeCans);
@@ -1175,6 +1186,62 @@ function update(dt) {
       p.life -= dt;
     }
     lavaGeyserParticles = lavaGeyserParticles.filter(p => p.life > 0);
+
+    // ── Fireballs ───────────────────────────────────────────────
+    fireballTimer -= dt;
+    if (fireballTimer <= 0) {
+      const topMargin = 30, botMargin = GROUND_H + 30;
+      fireballs.push({
+        x:   W + 24,
+        y:   topMargin + Math.random() * (H - topMargin - botMargin),
+        vx:  -(220 + Math.random() * 160),
+        vy:  (Math.random() - 0.5) * 90,
+        r:   13,
+        spin: 0,
+        wobble: Math.random() * Math.PI * 2,
+      });
+      fireballTimer = 2.5 + Math.random() * 2.5;
+    }
+
+    hellInvincible = Math.max(0, hellInvincible - dt);
+
+    for (const fb of fireballs) {
+      fb.x    += fb.vx * dt;
+      fb.y    += fb.vy * dt;
+      fb.spin += dt * 4;
+      fb.wobble += dt * 2.5;
+      fb.vy += Math.sin(fb.wobble) * 30 * dt; // wavy flight
+
+      // Spawn trailing fire particles
+      if (particlesEnabled && Math.random() < 0.4) {
+        spawnParticles(fb.x + fb.r * 0.5, fb.y, {
+          count: 2, colors: ['#ff6600','#ff3300','#ffcc00'],
+          speed: 30, life: 0.3, size: 3,
+        });
+      }
+
+      // Hit detection — skip if shield active or invincible
+      if (hellInvincible <= 0 && !activePowerups.shield) {
+        const dx = bird.x - fb.x, dy = bird.y - fb.y;
+        if (dx * dx + dy * dy < (HIT_R + fb.r) * (HIT_R + fb.r)) {
+          hellHealth--;
+          hellInvincible = 1.2;
+          triggerShake(8);
+          shieldFlash = 0.25; // brief white flash
+          sfx.death();
+          spawnParticles(bird.x, bird.y, {
+            count: 10, colors: ['#ff6600','#ff4400','#ffcc00'],
+            speed: 90, life: 0.6,
+          });
+          fb.x = -100; // remove this fireball
+          if (hellHealth <= 0) {
+            killBird();
+            return;
+          }
+        }
+      }
+    }
+    fireballs = fireballs.filter(fb => fb.x > -fb.r * 3);
   }
 
   // Power-ups
@@ -2062,6 +2129,59 @@ function drawCans() {
   }
 }
 
+function drawFireballs() {
+  if (!hellMode || fireballs.length === 0) return;
+  for (const fb of fireballs) {
+    if (fb.x < -fb.r * 3) continue;
+    ctx.save();
+    ctx.translate(fb.x, fb.y);
+    ctx.rotate(fb.spin);
+
+    // Outer glow
+    const grd = ctx.createRadialGradient(0, 0, 0, 0, 0, fb.r * 2.2);
+    grd.addColorStop(0,   'rgba(255,240,100,0.95)');
+    grd.addColorStop(0.3, 'rgba(255,120,0,0.80)');
+    grd.addColorStop(0.7, 'rgba(200,30,0,0.45)');
+    grd.addColorStop(1,   'rgba(100,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(0, 0, fb.r * 2.2, 0, Math.PI * 2); ctx.fill();
+
+    // Flame petals
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      ctx.fillStyle = `rgba(255,${80 + i * 20},0,0.55)`;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(a) * fb.r * 0.9, Math.sin(a) * fb.r * 0.9,
+                  fb.r * 0.7, fb.r * 0.35, a, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Hot core
+    ctx.fillStyle = '#fff8c0';
+    ctx.beginPath(); ctx.arc(0, 0, fb.r * 0.45, 0, Math.PI * 2); ctx.fill();
+
+    ctx.restore();
+  }
+}
+
+function drawHellHealth() {
+  if (!hellMode || gameState !== 'playing') return;
+  const heartSize = 14;
+  const startX    = W / 2 - ((HELL_MAX_HP - 1) * (heartSize * 2.2)) / 2;
+  const y         = 18;
+
+  for (let i = 0; i < HELL_MAX_HP; i++) {
+    const filled = i < hellHealth;
+    const cx     = startX + i * heartSize * 2.2;
+    // Flicker when invincible
+    if (hellInvincible > 0 && filled) {
+      ctx.globalAlpha = 0.4 + Math.sin(elapsedMs * 0.02) * 0.4;
+    }
+    drawHeart(cx, y, heartSize * 0.7, filled ? '#ff2200' : 'rgba(80,0,0,0.5)');
+    ctx.globalAlpha = 1;
+  }
+}
+
 function drawLavaGeysers() {
   if (!hellMode || lavaGeyserParticles.length === 0) return;
   for (const p of lavaGeyserParticles) {
@@ -2853,10 +2973,12 @@ function loop(ts) {
     drawPipes();
     drawGround();
     drawLavaGeysers();
+    drawFireballs();
     drawPowerups();
     drawParticles();
     drawCans();
     drawBird();
+    drawHellHealth();
     drawDim();
 
     // HUD overlays
