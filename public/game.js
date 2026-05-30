@@ -12,15 +12,18 @@ const stageEl     = document.getElementById('stage');
 const lbStatusEl  = document.getElementById('lbStatus');
 const lbListEl    = document.getElementById('lbList');
 const refreshBtn  = document.getElementById('refreshBtn');
+const canCountEl  = document.getElementById('canCount');
 
 // ── Constants ──────────────────────────────────────────────────────────────────
-const GRAVITY       = 1100;
-const FLAP_VEL      = -340;
+const GRAVITY       = 950;
+const FLAP_VEL      = -315;
+const FLAP_COOLDOWN = 150; // ms — prevents double-tap launches
 const PIPE_SPEED    = 170;
 const PIPE_W        = 72;
 const PIPE_GAP      = 166;
 const PIPE_INTERVAL = 1.35;
 const GROUND_H      = 90;
+const CAN_R         = 9;
 
 // ── Canvas ─────────────────────────────────────────────────────────────────────
 let W = 360, H = 640, DPR = 1;
@@ -49,6 +52,8 @@ let pipes = [];
 let clouds = [];
 let stars = [];
 let bgOffset = 0, spawnTimer = 0, elapsedMs = 0, score = 0, bestScore = 0;
+let cans = [], sessionCans = 0, lifetimeCans = 0;
+let lastFlapTime = -Infinity;
 
 const params = new URLSearchParams(location.search);
 let sessionId = params.get('sid');
@@ -209,6 +214,11 @@ function resetGame() {
     size: 0.8 + i * 0.16,
   }));
 
+  cans = [];
+  sessionCans = 0;
+  lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
+  canCountEl.textContent = String(lifetimeCans);
+
   scoreEl.textContent = '0';
   bestScore = Number(localStorage.getItem(bestScoreKey) || 0);
   bestScoreEl.textContent = String(bestScore);
@@ -217,6 +227,22 @@ function resetGame() {
 function addPipe() {
   const topH = 60 + Math.random() * (H - GROUND_H - PIPE_GAP - 140);
   pipes.push({ x: W + 30, topH, passed: false });
+  spawnCans(topH);
+}
+
+function spawnCans(topH) {
+  const gapCenter = topH + PIPE_GAP / 2;
+  const spread    = PIPE_GAP * 0.28;
+  const count     = 2 + (Math.random() < 0.4 ? 1 : 0);
+  const spacing   = 38;
+  const startX    = W + 30 + PIPE_W + 30; // just past the pipe mouth
+  for (let i = 0; i < count; i++) {
+    cans.push({
+      x: startX + i * spacing,
+      y: gapCenter + (Math.random() - 0.5) * spread * 2,
+      collected: false,
+    });
+  }
 }
 
 function rectsOverlap(a, b) {
@@ -312,25 +338,43 @@ function update(dt) {
   }
 
   pipes = pipes.filter(p => p.x > -PIPE_W - 40);
+
+  // Cans
+  for (const c of cans) {
+    if (c.collected) continue;
+    c.x -= PIPE_SPEED * dt;
+    const dx = bird.x - c.x, dy = bird.y - c.y;
+    if (dx * dx + dy * dy < (bird.r + CAN_R) * (bird.r + CAN_R)) {
+      c.collected = true;
+      sessionCans++;
+      lifetimeCans++;
+      localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+      canCountEl.textContent = String(lifetimeCans);
+    }
+  }
+  cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
 }
 
 // ── Input ──────────────────────────────────────────────────────────────────────
+function flap() {
+  const now = performance.now();
+  if (now - lastFlapTime < FLAP_COOLDOWN) return;
+  lastFlapTime = now;
+  bird.vy = FLAP_VEL;
+}
+
 window.addEventListener('keydown', (e) => {
   if ((e.code === 'Space' || e.code === 'ArrowUp') && gameState === 'playing') {
     e.preventDefault();
-    bird.vy = FLAP_VEL;
+    flap();
   }
 });
 
+// pointerdown handles both mouse and touch — no need for a separate touchstart
 stageEl.addEventListener('pointerdown', (e) => {
-  e.preventDefault();
-  if (gameState === 'playing') bird.vy = FLAP_VEL;
-});
-
-stageEl.addEventListener('touchstart', (e) => {
   if (gameState === 'playing') {
     e.preventDefault();
-    bird.vy = FLAP_VEL;
+    flap();
   }
 }, { passive: false });
 
@@ -471,6 +515,37 @@ function drawBird() {
   ctx.restore();
 }
 
+function drawCans() {
+  for (const c of cans) {
+    if (c.collected) continue;
+    const x = c.x, y = c.y, r = CAN_R;
+    const h = r * 2.2;
+
+    // Body
+    ctx.fillStyle = '#e8333a';
+    roundRect(x - r, y - h / 2, r * 2, h, 3);
+    ctx.fill();
+
+    // Top silver band
+    ctx.fillStyle = '#c0c8d0';
+    ctx.fillRect(x - r, y - h / 2, r * 2, h * 0.18);
+
+    // Bottom silver band
+    ctx.fillStyle = '#c0c8d0';
+    ctx.fillRect(x - r, y + h / 2 - h * 0.18, r * 2, h * 0.18);
+
+    // White highlight stripe
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.fillRect(x - r * 0.6, y - h / 2 + h * 0.18, r * 0.4, h * 0.64);
+
+    // Rim top ellipse
+    ctx.fillStyle = '#a8b2ba';
+    ctx.beginPath();
+    ctx.ellipse(x, y - h / 2, r, r * 0.32, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
 function drawDim() {
   if (gameState === 'playing') return;
   ctx.fillStyle = 'rgba(7,16,24,.10)';
@@ -504,6 +579,7 @@ function loop(ts) {
   drawClouds();
   drawPipes();
   drawGround();
+  drawCans();
   drawBird();
   drawDim();
 
