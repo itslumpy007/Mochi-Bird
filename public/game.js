@@ -70,16 +70,17 @@ function updateUI() {
   switch (gameState) {
     case 'loading':
       showOverlay('Mochi Bird', 'Loading…');
+      statusEl.textContent = 'Loading...';
       startBtn.disabled = true;
       break;
 
     case 'ready':
       if (isPractice) {
-        showOverlay('Practice Mode', 'Click or press Space to start!', 'Play');
-        statusEl.textContent = 'Practice mode';
+        showOverlay('Practice Mode', 'Scores are local only (not recorded)', 'Play');
+        statusEl.textContent = '⚠️ Practice mode (no recording)';
       } else {
-        showOverlay('Ready', `Playing as ${sessionData?.userTag || 'guest'}`, 'Play');
-        statusEl.textContent = `Ready — ${sessionData?.userTag || 'guest'}`;
+        showOverlay('Ready', `Playing as ${sessionData?.userTag || 'guest'} — Scores recorded!`, 'Play');
+        statusEl.textContent = `✅ Session: ${sessionData?.userTag || 'guest'}`;
       }
       startBtn.disabled = false;
       break;
