@@ -55,6 +55,9 @@ function curPipeSpeed() { return (PIPE_SPEED + Math.min(score * 2.5, 110)) * slo
 function curPipeGap()   { return Math.max(118, (PIPE_GAP - score * 1.8) / diffMult()); }
 
 // ── Skins ──────────────────────────────────────────────────────────────────────
+const hellBg      = new Image(); hellBg.src      = '/assets/cosmetics/hell-bg.png';
+const hellBirdImg = new Image(); hellBirdImg.src = '/assets/cosmetics/hell-bird.png';
+
 function makeSkin(id, name, price, src) {
   const img = new Image();
   img.src = src;
@@ -138,6 +141,11 @@ const SKIN_GROUPS = [
       makeSheetSkin('boba-cookies',    'Cookies & Cream',    150, 3, 1),
     ],
   },
+  {
+    label: 'Hell Mode',
+    desc: '😈 The devil herself',
+    skins: [ makeSkin('hell-bird', 'Hell Bird', 0, '/assets/cosmetics/hell-bird.png') ],
+  },
 ];
 
 const SKINS = SKIN_GROUPS.flatMap(g => g.skins);
@@ -163,6 +171,8 @@ function applyLayout() {
   document.body.classList.toggle('desktop', wide);
   document.body.classList.toggle('mobile',  !wide);
 }
+
+let hellMode = localStorage.getItem('mochi-bird-hell-mode') === 'true';
 
 // ── Game state (single source of truth) ──────────────────────────────────────
 // Explicit states: 'loading' | 'menu' | 'ready' | 'countdown' | 'playing' | 'dying' | 'dead' | 'error'
@@ -424,6 +434,7 @@ const sfx = {
 
 // ── Background music ───────────────────────────────────────────────────────────
 let musicPlaying = false;
+let hellMusicActive = false;
 let musicTimeoutId = null;
 const MUSIC_NOTES = [523, 659, 784, 659, 523, 784, 659, 523];
 const MUSIC_NOTE_DUR = 0.15;
@@ -451,15 +462,26 @@ function scheduleNextNote() {
   musicTimeoutId = setTimeout(scheduleNextNote, delay);
 }
 
+function scheduleHellMusic() {
+  if (!hellMusicActive || muted) return;
+  const ac = getAC(); if (!ac) return;
+  const notes = [220, 196, 185, 165, 196, 220, 174, 165];
+  notes.forEach((freq, i) => {
+    tone({ freq, end: freq * 0.95, type: 'sawtooth', vol: 0.04, dur: 0.18, delay: i * 0.19 });
+  });
+  musicTimeoutId = setTimeout(scheduleHellMusic, notes.length * 190);
+}
+
 function startMusic() {
-  if (muted || musicPlaying) return;
-  musicPlaying = true;
-  musicNoteIdx = 0;
-  scheduleNextNote();
+  if (muted) return;
+  stopMusic();
+  if (hellMode) { hellMusicActive = true; scheduleHellMusic(); }
+  else { musicPlaying = true; musicNoteIdx = 0; scheduleNextNote(); }
 }
 
 function stopMusic() {
   musicPlaying = false;
+  hellMusicActive = false;
   if (musicTimeoutId !== null) {
     clearTimeout(musicTimeoutId);
     musicTimeoutId = null;
@@ -841,7 +863,8 @@ function birdBox() {
 function killBird() {
   sfx.death();
   triggerShake(10);
-  if (particlesEnabled) spawnParticles(bird.x, bird.y, { count: 10, colors: ['#ff6eb4', '#ffb0d0', '#fff'], speed: 80, life: 0.8 });
+  const deathColors = hellMode ? ['#ff4400','#ff8800','#cc2200','#ffcc00'] : ['#ff6eb4','#ffb0d0','#fff'];
+  if (particlesEnabled) spawnParticles(bird.x, bird.y, { count: 10, colors: deathColors, speed: 80, life: 0.8 });
   gameState = 'dying';
   dyingTimer = 0;
   dyingVy    = bird.vy;
@@ -1103,7 +1126,8 @@ function update(dt) {
       localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
       canCountEl.textContent = String(lifetimeCans);
       sfx.collect();
-      if (particlesEnabled) spawnParticles(c.x, c.y, { count: 6, colors: ['#ffc857','#fff','#ff6eb4'], speed: 60, life: 0.5 });
+      const collectColors = hellMode ? ['#ff6600','#ffaa00','#ff4400'] : ['#ffc857','#fff','#ff6eb4'];
+      if (particlesEnabled) spawnParticles(c.x, c.y, { count: 6, colors: collectColors, speed: 60, life: 0.5 });
     }
   }
   cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
@@ -1607,6 +1631,22 @@ function drawHeart(x, y, size, color) {
 }
 
 function drawSky() {
+  if (hellMode) {
+    if (hellBg.complete && hellBg.naturalWidth > 0) {
+      ctx.drawImage(hellBg, 0, 0, W, H);
+    } else {
+      ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, W, H);
+    }
+    for (const s of stars) {
+      const alpha = 0.3 + Math.sin((elapsedMs / 1000) * s.twinkle + s.x) * 0.25;
+      ctx.globalAlpha = clamp(alpha, 0.05, 0.55);
+      ctx.fillStyle = ['#ff6600','#ff4400','#ffcc00'][Math.floor(s.x) % 3];
+      drawSparkle(s.x, s.y * 0.6, s.r * 2);
+    }
+    ctx.globalAlpha = 1;
+    return;
+  }
+
   const g = ctx.createLinearGradient(0, 0, 0, H);
   g.addColorStop(0,    '#89c4f0');
   g.addColorStop(0.45, '#e8b4d8');
@@ -1624,6 +1664,7 @@ function drawSky() {
 }
 
 function drawBuildings() {
+  if (hellMode) return;
   const groundY = H - GROUND_H;
   for (const b of buildings) {
     const bx = b.x - (bgOffset * 0.18 % (W + 120));
@@ -1644,6 +1685,7 @@ function drawBuildings() {
 }
 
 function drawClouds() {
+  if (hellMode) return;
   for (const c of clouds) {
     if (gameState === 'playing') {
       c.x -= c.speed * 0.008;
@@ -1686,6 +1728,11 @@ function drawClouds() {
 }
 
 function drawPipe(x, y, w, h, isTop) {
+  if (hellMode) {
+    drawHellPipe(x, y, w, h, isTop);
+    return;
+  }
+
   const collar = 18, collarX = x - 5, collarW = w + 10;
 
   if (isTop) {
@@ -1720,6 +1767,40 @@ function drawPipe(x, y, w, h, isTop) {
   }
 }
 
+function drawHellPipe(x, y, w, h, isTop) {
+  const collar = 18, collarX = x - 5, collarW = w + 10;
+
+  if (isTop) {
+    ctx.fillStyle = '#3d1505'; roundRect(x, y, w, h - collar, 6); ctx.fill();
+    ctx.fillStyle = '#5a2010'; ctx.fillRect(x + 7, y, 8, h - collar);
+    ctx.fillStyle = '#1a0800'; roundRect(collarX, y + h - collar, collarW, collar, 5); ctx.fill();
+    ctx.fillStyle = '#3d1505'; roundRect(collarX + 3, y + h - collar + 3, collarW - 6, collar - 5, 4); ctx.fill();
+    ctx.fillStyle = '#0d0300'; ctx.beginPath(); ctx.ellipse(x + w/2, y + h - collar + 5, w/2 - 3, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,80,0,0.25)'; ctx.beginPath(); ctx.ellipse(x + w/2, y + h - collar + 5, w/2 - 5, 5, 0, 0, Math.PI * 2); ctx.fill();
+    drawChain(x + w/2, y, h - collar - 10);
+  } else {
+    ctx.fillStyle = '#1a0800'; roundRect(collarX, y, collarW, collar, 5); ctx.fill();
+    ctx.fillStyle = '#3d1505'; roundRect(collarX + 3, y + 3, collarW - 6, collar - 5, 4); ctx.fill();
+    ctx.fillStyle = '#0d0300'; ctx.beginPath(); ctx.ellipse(x + w/2, y + collar - 5, w/2 - 3, 7, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,80,0,0.25)'; ctx.beginPath(); ctx.ellipse(x + w/2, y + collar - 5, w/2 - 5, 5, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#3d1505'; roundRect(x, y + collar, w, h - collar, 6); ctx.fill();
+    ctx.fillStyle = '#5a2010'; ctx.fillRect(x + 7, y + collar, 8, h - collar);
+  }
+}
+
+function drawChain(cx, y, length) {
+  if (length <= 0) return;
+  ctx.strokeStyle = '#2a0a00'; ctx.lineWidth = 2;
+  for (let i = 0; i < length; i += 8) {
+    ctx.strokeRect(cx - 3, y + i, 6, 5);
+  }
+  if (length > 40) {
+    const lx = cx, ly = y + length * 0.45;
+    ctx.fillStyle = '#1a0800'; roundRect(lx - 5, ly, 10, 14, 2); ctx.fill();
+    ctx.fillStyle = 'rgba(255,120,0,0.7)'; ctx.beginPath(); ctx.arc(lx, ly + 7, 3, 0, Math.PI * 2); ctx.fill();
+  }
+}
+
 function drawPipes() {
   for (const p of pipes) {
     const botY = p.topH + PIPE_GAP;
@@ -1730,6 +1811,11 @@ function drawPipes() {
 }
 
 function drawGround() {
+  if (hellMode) {
+    drawHellGround();
+    return;
+  }
+
   const y = H - GROUND_H;
 
   const g = ctx.createLinearGradient(0, y, 0, H);
@@ -1759,6 +1845,39 @@ function drawGround() {
     const hy = y + 3;
     drawHeart(hx, hy, 2.8, 'rgba(255,255,255,0.55)');
   }
+}
+
+function drawHellGround() {
+  const y = H - GROUND_H;
+  const g = ctx.createLinearGradient(0, y, 0, H);
+  g.addColorStop(0, '#e85000');
+  g.addColorStop(0.35, '#c03000');
+  g.addColorStop(1, '#6b1000');
+  ctx.fillStyle = g; ctx.fillRect(0, y, W, GROUND_H);
+
+  const t = elapsedMs / 600;
+  ctx.fillStyle = 'rgba(255,120,0,0.25)';
+  for (let i = 0; i < 8; i++) {
+    const bx = ((i * 137 + bgOffset * 0.4) % W);
+    const by = y + 8 + Math.sin(t + i) * 6;
+    const br = 4 + Math.sin(t * 1.3 + i * 0.7) * 3;
+    ctx.beginPath(); ctx.arc(bx, by, br, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.fillStyle = '#0d0500';
+  ctx.beginPath(); ctx.moveTo(0, y + 2);
+  const spikeW = 20;
+  const count = Math.ceil(W / spikeW) + 2;
+  const offset = bgOffset * 0.5 % spikeW;
+  for (let i = 0; i < count; i++) {
+    const sx = i * spikeW - offset;
+    ctx.lineTo(sx, y + 2);
+    ctx.lineTo(sx + spikeW / 2, y + 22);
+    ctx.lineTo(sx + spikeW, y + 2);
+  }
+  ctx.lineTo(W, y);
+  ctx.lineTo(W, H); ctx.lineTo(0, H);
+  ctx.closePath(); ctx.fill();
 }
 
 function drawBird(overrideY, overrideTilt) {
@@ -1809,12 +1928,15 @@ function drawBird(overrideY, overrideTilt) {
   const displayH = bird.r * 5.2;
 
   const img = displaySkin?.img || currentSkin.img;
-  if (img && img.complete && img.naturalWidth > 0) {
+  const effectiveImg = (hellMode && (equippedSkinId === 'default' || equippedSkinId === 'hell-bird'))
+    ? hellBirdImg
+    : img;
+  if (effectiveImg && effectiveImg.complete && effectiveImg.naturalWidth > 0) {
     // Regular sprite
-    const displayW = displayH * (img.naturalWidth / img.naturalHeight);
+    const displayW = displayH * (effectiveImg.naturalWidth / effectiveImg.naturalHeight);
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, clipR, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(img, -displayW / 2, -displayH * 0.48, displayW, displayH);
+    ctx.drawImage(effectiveImg, -displayW / 2, -displayH * 0.48, displayW, displayH);
     ctx.restore();
   } else if (displaySkin?.sheet?.complete && displaySkin.sheet.naturalWidth > 0) {
     // Sprite-sheet skin (boba tea etc.)
@@ -2111,7 +2233,7 @@ function drawPauseOverlay() {
 
 function drawDim() {
   if (gameState === 'playing' || gameState === 'dying' || gameState === 'countdown') return;
-  ctx.fillStyle = 'rgba(7,16,24,.10)';
+  ctx.fillStyle = hellMode ? 'rgba(50,0,0,0.12)' : 'rgba(7,16,24,.10)';
   ctx.fillRect(0, 0, W, H);
 }
 
@@ -2169,6 +2291,7 @@ function drawIconBtn(icon, cx, cy, r, bg) {
 
 function drawMainMenu() {
   menuBtns = [];
+  if (hellMode) { drawHellMenu(); return; }
 
   // ── Background ────────────────────────────────────────────────
   drawSky();
@@ -2272,7 +2395,7 @@ function drawMainMenu() {
   const btnZoneB = usableH - iconZoneH - 8;  // buttons end here
   const totalBtnH= btnZoneB - btnZoneT;
 
-  const btnCount = 4;                        // PLAY, SHOP, BIRDIES, SETTINGS
+  const btnCount = 5;                        // PLAY, SHOP, BIRDIES, SETTINGS, HELL MODE
   const btnH     = clamp(totalBtnH / (btnCount + 0.8), 38, 54);
   const gap      = (totalBtnH - btnH * btnCount) / (btnCount - 1);
   const btnW     = clamp(W * 0.60, 170, 270);
@@ -2298,6 +2421,11 @@ function drawMainMenu() {
   // SETTINGS
   drawMenuBtn('⚙️  SETTINGS', btnX, by, btnW, btnH, '#ffb347', '#b06010');
   menuBtns.push({ id: 'settings', x: btnX, y: by, w: btnW, h: btnH });
+  by += btnH + gap;
+
+  // HELL MODE
+  drawMenuBtn('🔥  HELL MODE', btnX, by, btnW, btnH, '#8b0000', '#3d0000');
+  menuBtns.push({ id: 'hellmode', x: btnX, y: by, w: btnW, h: btnH });
 
   // ── Icon circles (sit between bottom of buttons and ground) ───
   const iconR = clamp(W * 0.060, 20, 28);
@@ -2349,6 +2477,13 @@ function handleMenuClick(px, py) {
         case 'daily':
           showToast(`🔥 Streak: Day ${streakCount}  •  🥫 ${lifetimeCans} cans`);
           break;
+        case 'hellmode':
+          hellMode = !hellMode;
+          localStorage.setItem('mochi-bird-hell-mode', String(hellMode));
+          if (hellMode && equippedSkinId === 'default') {
+            handleSkinAction('hell-bird');
+          }
+          break;
       }
       return;
     }
@@ -2357,6 +2492,7 @@ function handleMenuClick(px, py) {
 
 // ── Startup screen ─────────────────────────────────────────────────────────────
 function drawStartupScreen() {
+  if (hellMode) { drawHellStartupScreen(); return; }
   drawSky();
   drawBuildings();
 
@@ -2447,6 +2583,157 @@ function drawStartupScreen() {
   if (startupProgress > 0.05) {
     drawHeart(barX + 2 + fillW - 4, barY + barH / 2, 5, '#fff');
   }
+}
+
+function drawHellStartupScreen() {
+  if (hellBg.complete && hellBg.naturalWidth > 0) {
+    ctx.drawImage(hellBg, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, W, H);
+  }
+
+  ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fillRect(0, 0, W, H);
+
+  for (const s of stars) {
+    const alpha = 0.3 + Math.sin((elapsedMs / 1000) * s.twinkle + s.x) * 0.25;
+    ctx.globalAlpha = clamp(alpha, 0.05, 0.6);
+    ctx.fillStyle = ['#ff6600','#ff4400','#ffcc00'][Math.floor(s.x) % 3];
+    drawSparkle(s.x, s.y * 0.6, s.r * 2.5);
+  }
+  ctx.globalAlpha = 1;
+
+  if (hellBirdImg.complete && hellBirdImg.naturalWidth > 0) {
+    const dh = clamp(H * 0.18, 70, 110);
+    const dw = dh * (hellBirdImg.naturalWidth / hellBirdImg.naturalHeight);
+    const bx = W / 2 - dw / 2;
+    const by = H * 0.28 + Math.sin(elapsedMs * 0.003) * 8;
+    ctx.save();
+    ctx.beginPath(); ctx.arc(W/2, by + dh*0.5, dh*0.5, 0, Math.PI*2); ctx.clip();
+    ctx.drawImage(hellBirdImg, bx, by, dw, dh);
+    ctx.restore();
+  }
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+  const fs1 = clamp(W * 0.11, 24, 48);
+  ctx.font = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 8; ctx.strokeText('MOCHI', W/2, H * 0.14);
+  ctx.fillStyle = '#ff6600'; ctx.fillText('MOCHI', W/2, H * 0.14);
+  const fs2 = clamp(W * 0.14, 30, 60);
+  ctx.font = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#000'; ctx.lineWidth = 10; ctx.strokeText('BIRD', W/2, H * 0.14 + fs1 * 1.1);
+  ctx.fillStyle = '#ff4400'; ctx.fillText('BIRD', W/2, H * 0.14 + fs1 * 1.1);
+  ctx.font = `700 ${clamp(W * 0.065, 14, 26)}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.fillStyle = '#ffcc00'; ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+  ctx.strokeText('💀 HELL MODE 💀', W/2, H * 0.14 + fs1 * 1.1 + fs2 * 0.8);
+  ctx.fillText('💀 HELL MODE 💀', W/2, H * 0.14 + fs1 * 1.1 + fs2 * 0.8);
+
+  const barW = W * 0.62, barH = 22;
+  const barX = W/2 - barW/2, barY = H * 0.74;
+  ctx.font = `800 ${clamp(W*0.048,12,18)}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 4;
+  ctx.strokeText('LOADING...', W/2, barY - 18);
+  ctx.fillStyle = '#ff6600'; ctx.fillText('LOADING...', W/2, barY - 18);
+  ctx.fillStyle = 'rgba(0,0,0,0.5)'; roundRect(barX, barY, barW, barH, barH/2);
+  ctx.strokeStyle = '#8b1500'; ctx.lineWidth = 2; ctx.stroke();
+  const fillW = Math.max(barH, (barW - 4) * startupProgress);
+  const fg = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
+  fg.addColorStop(0, '#ff8800'); fg.addColorStop(1, '#ff2200');
+  ctx.fillStyle = fg;
+  ctx.save();
+  ctx.beginPath();
+  const r2 = (barH-4)/2;
+  if (ctx.roundRect) ctx.roundRect(barX+2, barY+2, fillW, barH-4, r2);
+  ctx.fill(); ctx.restore();
+  if (startupProgress > 0.05) {
+    ctx.font = `${barH * 0.9}px sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('💀', barX + 2 + fillW, barY + barH/2);
+  }
+}
+
+function drawHellMenu() {
+  menuBtns = [];
+  if (hellBg.complete && hellBg.naturalWidth > 0) {
+    ctx.drawImage(hellBg, 0, 0, W, H);
+  } else {
+    ctx.fillStyle = '#1a0000'; ctx.fillRect(0, 0, W, H);
+  }
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+
+  for (const s of stars) {
+    const alpha = 0.25 + Math.sin((elapsedMs/1000)*s.twinkle+s.x)*0.2;
+    ctx.globalAlpha = clamp(alpha,0.05,0.5);
+    ctx.fillStyle = ['#ff6600','#ff4400','#ffcc00'][Math.floor(s.x)%3];
+    drawSparkle(s.x, s.y*0.6, s.r*2);
+  }
+  ctx.globalAlpha = 1;
+
+  ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.lineJoin='round';
+  const titleCX=W/2, titleCY=H*0.16;
+  const fs1=clamp(W*0.105,22,46);
+  ctx.font=`900 ${fs1}px "Trebuchet MS",Verdana,sans-serif`;
+  ctx.strokeStyle='#000'; ctx.lineWidth=8; ctx.strokeText('MOCHI',titleCX,titleCY-fs1*0.60);
+  ctx.fillStyle='#ff6600'; ctx.fillText('MOCHI',titleCX,titleCY-fs1*0.60);
+  const fs2=clamp(W*0.135,28,58);
+  ctx.font=`900 ${fs2}px "Trebuchet MS",Verdana,sans-serif`;
+  ctx.strokeStyle='#000'; ctx.lineWidth=9; ctx.strokeText('BIRD',titleCX,titleCY+fs2*0.55);
+  ctx.fillStyle='#ff4400'; ctx.fillText('BIRD',titleCX,titleCY+fs2*0.55);
+  ctx.font=`700 ${clamp(W*0.055,12,22)}px "Trebuchet MS",Verdana,sans-serif`;
+  ctx.fillStyle='#ffcc00'; ctx.strokeStyle='#000'; ctx.lineWidth=3;
+  ctx.strokeText('💀 HELL MODE 💀',titleCX,titleCY+fs2*1.15);
+  ctx.fillText('💀 HELL MODE 💀',titleCX,titleCY+fs2*1.15);
+
+  const birdCR=clamp(W*0.085,26,38);
+  const birdCX=W/2, birdCY=H*0.355+Math.sin(elapsedMs*0.003)*5;
+  ctx.save();
+  ctx.shadowColor='rgba(255,80,0,0.7)'; ctx.shadowBlur=16;
+  ctx.fillStyle='rgba(80,0,0,0.4)';
+  ctx.beginPath(); ctx.arc(birdCX,birdCY,birdCR+4,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  if (hellBirdImg.complete && hellBirdImg.naturalWidth>0) {
+    const dh=birdCR*4.2, dw=dh*(hellBirdImg.naturalWidth/hellBirdImg.naturalHeight);
+    ctx.save();
+    ctx.beginPath(); ctx.arc(birdCX,birdCY,birdCR,0,Math.PI*2); ctx.clip();
+    ctx.drawImage(hellBirdImg,birdCX-dw/2,birdCY-dh*0.48,dw,dh);
+    ctx.restore();
+  }
+  ctx.strokeStyle='#ff4400'; ctx.lineWidth=2.5;
+  ctx.beginPath(); ctx.arc(birdCX,birdCY,birdCR,0,Math.PI*2); ctx.stroke();
+
+  const usableH=(H-GROUND_H)*0.98;
+  const btnZoneT=usableH*0.43, iconZoneH=clamp(W*0.14,48,68);
+  const btnZoneB=usableH-iconZoneH-8, totalBtnH=btnZoneB-btnZoneT;
+  const btnCount=5;
+  const btnH=clamp(totalBtnH/(btnCount+0.8),34,50);
+  const gap=(totalBtnH-btnH*btnCount)/(btnCount-1);
+  const btnW=clamp(W*0.60,170,270), btnX=W/2-btnW/2, playW=btnW*1.05;
+  let by=btnZoneT;
+
+  drawMenuBtn('🔥  PLAY',W/2-playW/2,by,playW,btnH*1.12,'#8b0000','#3d0000');
+  menuBtns.push({id:'play',x:W/2-playW/2,y:by,w:playW,h:btnH*1.12});
+  by+=btnH*1.12+gap;
+  drawMenuBtn('🛒  SHOP',btnX,by,btnW,btnH,'#4a0e00','#200500');
+  menuBtns.push({id:'shop',x:btnX,y:by,w:btnW,h:btnH});
+  by+=btnH+gap;
+  drawMenuBtn('😈  BIRDIES',btnX,by,btnW,btnH,'#3d1505','#1a0500');
+  menuBtns.push({id:'birdies',x:btnX,y:by,w:btnW,h:btnH});
+  by+=btnH+gap;
+  drawMenuBtn('⚙️  SETTINGS',btnX,by,btnW,btnH,'#2a0a00','#0d0300');
+  menuBtns.push({id:'settings',x:btnX,y:by,w:btnW,h:btnH});
+  by+=btnH+gap;
+  drawMenuBtn('🌸  KAWAII MODE',btnX,by,btnW,btnH,'#1a1a4a','#0a0a2a');
+  menuBtns.push({id:'hellmode',x:btnX,y:by,w:btnW,h:btnH});
+
+  drawHellGround();
+  const iconR=clamp(W*0.060,20,28), iconY=H-GROUND_H-iconR-8;
+  drawIconBtn('🏆',W*0.14,iconY,iconR,'#8b2500');
+  menuBtns.push({id:'leaderboard',x:W*0.14-iconR,y:iconY-iconR,w:iconR*2,h:iconR*2});
+  drawIconBtn('📊',W*0.28,iconY,iconR,'#5a1500');
+  menuBtns.push({id:'stats',x:W*0.28-iconR,y:iconY-iconR,w:iconR*2,h:iconR*2});
+  drawIconBtn('🎯',W*0.72,iconY,iconR,'#6b0000');
+  menuBtns.push({id:'challenges',x:W*0.72-iconR,y:iconY-iconR,w:iconR*2,h:iconR*2});
+  drawIconBtn('🎁',W*0.86,iconY,iconR,'#3d1505');
+  menuBtns.push({id:'daily',x:W*0.86-iconR,y:iconY-iconR,w:iconR*2,h:iconR*2});
 }
 
 // ── Render loop ────────────────────────────────────────────────────────────────
