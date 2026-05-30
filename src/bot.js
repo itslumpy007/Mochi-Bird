@@ -44,6 +44,7 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
     try {
       // ── /mochi ──────────────────────────────────────────────────────────────
       if (interaction.commandName === 'mochi') {
+        console.log(`[bot] /mochi command received from ${interaction.user.tag}`);
         const session = createSession({
           userId:    interaction.user.id,
           userTag:   interaction.user.tag,
