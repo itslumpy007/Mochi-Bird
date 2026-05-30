@@ -502,3 +502,81 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   padding: 5px 8px;
   min-height: 26px;
 }
+
+/* ── Pause button ─────────────────────────────────────────────── */
+.pause-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 20;
+  background: rgba(0,0,0,.4);
+  color: #fff;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  min-width: 0;
+  min-height: 0;
+  font-size: 1.1rem;
+  padding: 0;
+  box-shadow: none;
+  border: 1px solid rgba(255,255,255,.2);
+}
+
+/* ── Share button ─────────────────────────────────────────────── */
+.share-btn {
+  margin-top: 8px;
+  display: block;
+  width: 100%;
+}
+
+/* ── Challenges modal ─────────────────────────────────────────── */
+.challenges-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 8px;
+}
+
+.challenge-item {
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.challenge-item.completed {
+  border-color: rgba(37,208,171,.4);
+  background: rgba(37,208,171,.06);
+}
+
+.challenge-desc {
+  font-weight: 700;
+  font-size: .92rem;
+  margin-bottom: 8px;
+}
+
+.challenge-bar-wrap {
+  height: 6px;
+  background: rgba(255,255,255,.12);
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 6px;
+}
+
+.challenge-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6eb4, #ffc857);
+  border-radius: 3px;
+  transition: width .3s ease;
+}
+
+.challenge-meta {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: .8rem;
+}
+
+.challenge-progress { color: var(--muted); }
+.challenge-reward   { color: var(--gold); font-weight: 700; margin-left: auto; }
+.challenge-done     { color: var(--accent); font-weight: 800; }

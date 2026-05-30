@@ -113,6 +113,14 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
 
   // ── Score notification helper ──────────────────────────────────────────────
   return {
+    async shareScore({ session, score }) {
+      if (!session?.channelId) return;
+      try {
+        const channel = await client.channels.fetch(session.channelId);
+        if (!channel?.isTextBased?.()) return;
+        await channel.send(`🐦 **${session.userTag}** just scored **${score}** in Mochi Bird! 🎮 Think you can beat it?`);
+      } catch (err) { console.warn('[bot] shareScore failed:', err.message); }
+    },
     async notifyScore({ session, score, personalBest, leaderboard }) {
       if (!session?.userId) return;
       try {

@@ -19,6 +19,12 @@ const storeModalEl    = document.getElementById('storeModal');
 const storeCloseBtnEl = document.getElementById('storeCloseBtn');
 const storeBalanceEl  = document.getElementById('storeBalance');
 const skinGridEl      = document.getElementById('skinGrid');
+const pauseBtnEl      = document.getElementById('pauseBtn');
+const shareBtn        = document.getElementById('shareBtn');
+const challengesBtnEl = document.getElementById('challengesBtn');
+const challengesModalEl = document.getElementById('challengesModal');
+const challengesCloseBtnEl = document.getElementById('challengesCloseBtn');
+const challengesListEl = document.getElementById('challengesList');
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const GRAVITY       = 950;
@@ -33,7 +39,8 @@ const CAN_R         = 9;
 const HIT_R         = 10;    // collision radius (smaller than visual for fair play)
 
 // Difficulty helpers
-function curPipeSpeed() { return PIPE_SPEED + Math.min(score * 2.5, 110); }
+let slowMult = 1;
+function curPipeSpeed() { return (PIPE_SPEED + Math.min(score * 2.5, 110)) * slowMult; }
 function curPipeGap()   { return Math.max(118, PIPE_GAP - score * 1.8); }
 
 // ── Skins ──────────────────────────────────────────────────────────────────────
@@ -117,7 +124,7 @@ function applyLayout() {
 }
 
 // ── Game state (single source of truth) ──────────────────────────────────────
-// Explicit states: 'loading' | 'ready' | 'playing' | 'dead' | 'error'
+// Explicit states: 'loading' | 'ready' | 'countdown' | 'playing' | 'dying' | 'dead' | 'error'
 let gameState = 'loading';
 
 let bird = { x: 100, y: 270, r: 14, vy: 0 };
@@ -129,6 +136,199 @@ let buildings = [];
 let startupProgress = 0;
 let startupReady    = false;
 let pendingReady    = false;
+
+// ── Screen shake ──────────────────────────────────────────────────────────────
+let shakeAmt = 0;
+function triggerShake(amt) { shakeAmt = amt; }
+
+// ── Death animation ───────────────────────────────────────────────────────────
+let dyingTimer = 0;
+let dyingVy    = 0;
+
+// ── Countdown ─────────────────────────────────────────────────────────────────
+let countdownVal   = 3;
+let countdownTimer = 0;
+
+// ── Particles ─────────────────────────────────────────────────────────────────
+let particles = [];
+function spawnParticles(x, y, { count = 8, colors = ['#fff'], speed = 80, life = 0.6, size = 5, type = 'circle' } = {}) {
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const spd   = speed * (0.5 + Math.random() * 0.8);
+    particles.push({
+      x, y,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      life,
+      maxLife: life,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: size * (0.6 + Math.random() * 0.8),
+      type,
+    });
+  }
+}
+
+// ── New personal best ─────────────────────────────────────────────────────────
+let newBestAchieved  = false;
+let newBestAnimTimer = 0;
+
+// ── Combo ─────────────────────────────────────────────────────────────────────
+let combo    = 0;
+let maxCombo = 0;
+function getCanMult() {
+  if (combo >= 10) return 3;
+  if (combo >= 5)  return 2;
+  return 1;
+}
+
+// ── Power-ups ─────────────────────────────────────────────────────────────────
+let powerups = [];
+let activePowerups = { magnet: 0, shield: false, slow: 0 };
+let shieldFlash = 0; // timer for white flash effect
+
+// ── Pause ─────────────────────────────────────────────────────────────────────
+let paused = false;
+
+// ── Tutorial ──────────────────────────────────────────────────────────────────
+let tutorialActive = false;
+let tutorialStep   = 0;
+
+// ── Run history ───────────────────────────────────────────────────────────────
+let runHistory = JSON.parse(localStorage.getItem('mochi-bird-runs') || '[]');
+
+// ── Daily streak ──────────────────────────────────────────────────────────────
+let streakCount = 0;
+function checkStreak() {
+  const todayStr = new Date().toDateString();
+  const yesterday = new Date(Date.now() - 86400000).toDateString();
+  const lastDate  = localStorage.getItem('mochi-bird-streak-date');
+  const lastCount = Number(localStorage.getItem('mochi-bird-streak-count') || 0);
+  if (lastDate === todayStr) {
+    streakCount = lastCount;
+    return; // already done today
+  }
+  if (lastDate === yesterday) {
+    streakCount = lastCount + 1;
+  } else {
+    streakCount = 1;
+  }
+  localStorage.setItem('mochi-bird-streak-date', todayStr);
+  localStorage.setItem('mochi-bird-streak-count', String(streakCount));
+  // Award bonus cans
+  let bonus = 0;
+  if (streakCount >= 30) bonus = 200;
+  else if (streakCount >= 14) bonus = 100;
+  else if (streakCount >= 7)  bonus = 50;
+  else if (streakCount >= 3)  bonus = 25;
+  else bonus = 10;
+  lifetimeCans += bonus;
+  localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+  canCountEl.textContent = String(lifetimeCans);
+  setTimeout(() => showToast(`🔥 Day ${streakCount} streak! +${bonus} cans`), 1000);
+}
+
+// ── Daily challenges ──────────────────────────────────────────────────────────
+const CHALLENGE_POOL = [
+  { id: 'score10',  desc: 'Score 10 points in one run',          type: 'score',  target: 10,  reward: 15 },
+  { id: 'score25',  desc: 'Score 25 points in one run',          type: 'score',  target: 25,  reward: 30 },
+  { id: 'score50',  desc: 'Score 50 points in one run',          type: 'score',  target: 50,  reward: 60 },
+  { id: 'cans20',   desc: 'Collect 20 cans in one session',      type: 'cans',   target: 20,  reward: 20 },
+  { id: 'cans50',   desc: 'Collect 50 cans in one session',      type: 'cans',   target: 50,  reward: 40 },
+  { id: 'plays3',   desc: 'Play 3 games',                        type: 'plays',  target: 3,   reward: 10 },
+  { id: 'plays5',   desc: 'Play 5 games',                        type: 'plays',  target: 5,   reward: 20 },
+  { id: 'combo5',   desc: 'Reach a 5 pipe combo',                type: 'combo',  target: 5,   reward: 15 },
+  { id: 'combo10',  desc: 'Reach a 10 pipe combo',               type: 'combo',  target: 10,  reward: 30 },
+  { id: 'cans10',   desc: 'Collect 10 cans in one run',          type: 'cans',   target: 10,  reward: 10 },
+  { id: 'score5',   desc: 'Score 5 points in one run',           type: 'score',  target: 5,   reward: 8  },
+  { id: 'plays1',   desc: 'Play your first game today',          type: 'plays',  target: 1,   reward: 5  },
+];
+
+let todaysChallenges = [];
+let challengeProgress = {};
+let challengeSessionCans = 0;
+let challengeSessionPlays = 0;
+
+function getTodaysChallenges() {
+  const dateStr = new Date().toDateString();
+  let hash = 0;
+  for (let i = 0; i < dateStr.length; i++) hash = (hash * 31 + dateStr.charCodeAt(i)) >>> 0;
+  const indices = [];
+  let seed = hash;
+  while (indices.length < 3) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    const idx = seed % CHALLENGE_POOL.length;
+    if (!indices.includes(idx)) indices.push(idx);
+  }
+  return indices.map(i => CHALLENGE_POOL[i]);
+}
+
+function initChallenges() {
+  const todayStr = new Date().toDateString();
+  todaysChallenges = getTodaysChallenges();
+  const saved = JSON.parse(localStorage.getItem(`mochi-challenge-${todayStr}`) || '{}');
+  challengeProgress = {};
+  for (const c of todaysChallenges) {
+    challengeProgress[c.id] = saved[c.id] || { value: 0, completed: false };
+  }
+  challengeSessionCans  = 0;
+  challengeSessionPlays = 0;
+}
+
+function saveChallengeProgress() {
+  const todayStr = new Date().toDateString();
+  localStorage.setItem(`mochi-challenge-${todayStr}`, JSON.stringify(challengeProgress));
+}
+
+function updateChallengeProgress(type, value) {
+  for (const c of todaysChallenges) {
+    const prog = challengeProgress[c.id];
+    if (!prog || prog.completed) continue;
+    if (c.type !== type) continue;
+    if (type === 'score' || type === 'combo') {
+      if (value >= c.target) {
+        prog.value = c.target;
+        prog.completed = true;
+        lifetimeCans += c.reward;
+        localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+        canCountEl.textContent = String(lifetimeCans);
+        showToast(`🎯 Challenge done! +${c.reward} cans`);
+      } else {
+        prog.value = Math.max(prog.value, value);
+      }
+    } else {
+      prog.value += value;
+      if (prog.value >= c.target) {
+        prog.value = c.target;
+        prog.completed = true;
+        lifetimeCans += c.reward;
+        localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+        canCountEl.textContent = String(lifetimeCans);
+        showToast(`🎯 Challenge done! +${c.reward} cans`);
+      }
+    }
+  }
+  saveChallengeProgress();
+}
+
+function renderChallengesModal() {
+  challengesListEl.innerHTML = '';
+  for (const c of todaysChallenges) {
+    const prog = challengeProgress[c.id] || { value: 0, completed: false };
+    const pct  = Math.min(1, prog.value / c.target);
+    const div  = document.createElement('div');
+    div.className = 'challenge-item' + (prog.completed ? ' completed' : '');
+    div.innerHTML = `
+      <div class="challenge-desc">${c.desc}</div>
+      <div class="challenge-bar-wrap"><div class="challenge-bar" style="width:${Math.round(pct*100)}%"></div></div>
+      <div class="challenge-meta">
+        <span class="challenge-progress">${prog.value}/${c.target}</span>
+        <span class="challenge-reward">+${c.reward} 🥫</span>
+        ${prog.completed ? '<span class="challenge-done">Done ✓</span>' : ''}
+      </div>
+    `;
+    challengesListEl.appendChild(div);
+  }
+}
 
 // ── Audio ──────────────────────────────────────────────────────────────────────
 let audioCtx = null;
@@ -199,7 +399,7 @@ function refreshAnimSkins() {
 
 // ── Preview (try-on) ───────────────────────────────────────────────────────────
 let previewSkinId = null; // temporarily shown skin; reverts if unowned at game start
-let cans = [], sessionCans = 0, lifetimeCans = 0;
+let cans = [], sessionCans = 0, lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
 let lastFlapTime = -Infinity;
 
 const params = new URLSearchParams(location.search);
@@ -224,6 +424,28 @@ function setGameState(state) {
 }
 
 function updateUI() {
+  // Pause button visibility
+  if (pauseBtnEl) {
+    if (gameState === 'playing' && !paused) {
+      pauseBtnEl.classList.remove('hidden');
+    } else if (gameState === 'playing' && paused) {
+      pauseBtnEl.classList.remove('hidden');
+    } else {
+      pauseBtnEl.classList.add('hidden');
+    }
+  }
+
+  // Share button visibility
+  if (shareBtn) {
+    if (gameState === 'dead' && sessionId) {
+      shareBtn.classList.remove('hidden');
+      shareBtn.disabled = false;
+      shareBtn.textContent = 'Share 📢';
+    } else {
+      shareBtn.classList.add('hidden');
+    }
+  }
+
   switch (gameState) {
     case 'loading':
       hideOverlay();   // canvas draws the startup screen
@@ -244,9 +466,21 @@ function updateUI() {
       shopBtnEl.disabled = false;
       break;
 
+    case 'countdown':
+      hideOverlay();
+      startBtn.disabled = true;
+      shopBtnEl.disabled = true;
+      break;
+
     case 'playing':
       hideOverlay();
       statusEl.textContent = isPractice ? 'Playing' : 'Session running';
+      startBtn.disabled = true;
+      shopBtnEl.disabled = true;
+      break;
+
+    case 'dying':
+      hideOverlay();
       startBtn.disabled = true;
       shopBtnEl.disabled = true;
       break;
@@ -281,8 +515,10 @@ startBtn.addEventListener('click', () => {
   }
 
   if (gameState === 'ready') {
-    // Start playing
-    setGameState('playing');
+    // Start countdown instead of going directly to playing
+    setGameState('countdown');
+    countdownVal   = 3;
+    countdownTimer = 0;
     return;
   }
 });
@@ -366,7 +602,7 @@ function resetGame() {
     y: H * (0.08 + (i % 3) * 0.07),
     speed: 6 + i * 1.8,
     size: 0.7 + i * 0.14,
-    face: i % 3, // 0=smile, 1=wink, 2=smile
+    face: i % 3,
   }));
 
   buildings = Array.from({ length: 9 }, (_, i) => ({
@@ -393,6 +629,23 @@ function resetGame() {
   scoreEl.textContent = '0';
   bestScore = Number(localStorage.getItem(bestScoreKey) || 0);
   bestScoreEl.textContent = String(bestScore);
+
+  // New feature resets
+  shakeAmt         = 0;
+  particles        = [];
+  newBestAchieved  = false;
+  newBestAnimTimer = 0;
+  combo            = 0;
+  maxCombo         = 0;
+  powerups         = [];
+  activePowerups   = { magnet: 0, shield: false, slow: 0 };
+  slowMult         = 1;
+  shieldFlash      = 0;
+  paused           = false;
+  dyingTimer       = 0;
+  dyingVy          = 0;
+  if (pauseBtnEl) { pauseBtnEl.textContent = '⏸'; }
+  challengeSessionCans = 0;
 }
 
 function addPipe() {
@@ -400,12 +653,18 @@ function addPipe() {
   const topH = 60 + Math.random() * (H - GROUND_H - gap - 140);
   pipes.push({ x: W + 30, topH, gap, passed: false });
   spawnCans(topH, gap);
+  // 15% chance to spawn a power-up in the gap
+  if (Math.random() < 0.15) {
+    const types = ['magnet', 'shield', 'slow'];
+    const type  = types[Math.floor(Math.random() * types.length)];
+    const gapCenter = topH + gap / 2;
+    powerups.push({ x: W + 30 + PIPE_W / 2, y: gapCenter, type, collected: false });
+  }
 }
 
 function spawnCans(topH, gap) {
   const gapCenter = topH + gap / 2;
   const spread    = gap * 0.28;
-  // More cans at higher scores — reward skilled play
   const bonusCount = Math.floor(score / 8);
   const count      = 2 + bonusCount + (Math.random() < 0.38 ? 1 : 0);
   const spacing    = 36;
@@ -425,6 +684,16 @@ function rectsOverlap(a, b) {
 
 function birdBox() {
   return { x: bird.x - HIT_R, y: bird.y - HIT_R, w: HIT_R * 2, h: HIT_R * 2 };
+}
+
+function killBird() {
+  sfx.death();
+  triggerShake(10);
+  spawnParticles(bird.x, bird.y, { count: 10, colors: ['#ff6eb4', '#ffb0d0', '#fff'], speed: 80, life: 0.8 });
+  gameState = 'dying';
+  dyingTimer = 0;
+  dyingVy    = bird.vy;
+  updateUI();
 }
 
 async function submitScore() {
@@ -449,11 +718,31 @@ async function submitScore() {
   }
 }
 
+function onDeath() {
+  // Save run history
+  runHistory.push(score);
+  if (runHistory.length > 10) runHistory = runHistory.slice(-10);
+  localStorage.setItem('mochi-bird-runs', JSON.stringify(runHistory));
+
+  // Challenge progress
+  challengeSessionPlays++;
+  updateChallengeProgress('plays', 1);
+  updateChallengeProgress('score', score);
+  updateChallengeProgress('combo', maxCombo);
+
+  submitScore();
+  if (score > bestScore) {
+    bestScore = score;
+    bestScoreEl.textContent = String(bestScore);
+    localStorage.setItem(bestScoreKey, String(bestScore));
+  }
+  setGameState('dead');
+}
+
 function update(dt) {
-  elapsedMs += dt * 1000; // always tick so sparkles animate on startup screen
+  elapsedMs += dt * 1000;
 
   if (gameState === 'loading') {
-    // Drive bar: fast until 85%, then wait for session; snap to 100% when done
     const target = startupReady ? 1 : 0.85;
     startupProgress += (target - startupProgress) * dt * (startupReady ? 4 : 1.2);
     startupProgress = Math.min(startupProgress, target);
@@ -462,7 +751,6 @@ function update(dt) {
       setGameState('ready');
       return;
     }
-    // Drift clouds slowly during startup
     for (const c of clouds) {
       c.x -= c.speed * 0.004;
       if (c.x < -140) c.x = W + 140;
@@ -470,8 +758,59 @@ function update(dt) {
     return;
   }
 
+  // ── Countdown update ───────────────────────────────────────────────────────
+  if (gameState === 'countdown') {
+    countdownTimer += dt;
+    if (countdownTimer >= 1) {
+      countdownTimer -= 1;
+      countdownVal--;
+      if (countdownVal < 0) {
+        setGameState('playing');
+        return;
+      }
+    }
+    return;
+  }
+
+  // ── Dying update ───────────────────────────────────────────────────────────
+  if (gameState === 'dying') {
+    dyingTimer += dt;
+    bird.vy += GRAVITY * dt;
+    bird.y  += bird.vy * dt;
+    // Update particles while dying
+    updateParticles(dt);
+    if (dyingTimer >= 0.65) {
+      onDeath();
+    }
+    return;
+  }
+
   if (gameState !== 'playing') return;
-  // (elapsedMs already incremented above)
+  if (paused) return;
+
+  // ── Active power-up timers ────────────────────────────────────────────────
+  if (activePowerups.magnet > 0) {
+    activePowerups.magnet -= dt;
+    if (activePowerups.magnet < 0) activePowerups.magnet = 0;
+  }
+  if (activePowerups.slow > 0) {
+    activePowerups.slow -= dt;
+    if (activePowerups.slow <= 0) {
+      activePowerups.slow = 0;
+      slowMult = 1;
+    } else {
+      slowMult = 0.6;
+    }
+  } else {
+    slowMult = 1;
+  }
+  if (shieldFlash > 0) shieldFlash -= dt;
+
+  // ── New best banner timer ────────────────────────────────────────────────
+  if (newBestAnimTimer > 0) newBestAnimTimer -= dt;
+
+  // ── Particles ─────────────────────────────────────────────────────────────
+  updateParticles(dt);
 
   bird.vy += GRAVITY * dt;
   bird.y += bird.vy * dt;
@@ -486,15 +825,16 @@ function update(dt) {
 
   // Ground
   if (bird.y + HIT_R >= H - GROUND_H) {
-    sfx.death();
-    setGameState('dead');
-    submitScore();
-    if (score > bestScore) {
-      bestScore = score;
-      bestScoreEl.textContent = String(bestScore);
-      localStorage.setItem(bestScoreKey, String(bestScore));
+    if (activePowerups.shield) {
+      activePowerups.shield = false;
+      shieldFlash = 0.3;
+      bird.y = H - GROUND_H - HIT_R - 1;
+      bird.vy = FLAP_VEL * 0.5;
+      triggerShake(5);
+    } else {
+      killBird();
+      return;
     }
-    return;
   }
 
   // Pipes
@@ -509,27 +849,35 @@ function update(dt) {
     const bottom = { x: p.x, y: p.topH + p.gap, w: PIPE_W, h: H - GROUND_H - (p.topH + p.gap) };
 
     if (rectsOverlap(bb, top) || rectsOverlap(bb, bottom)) {
-      sfx.death();
-      setGameState('dead');
-      submitScore();
-      if (score > bestScore) {
-        bestScore = score;
-        bestScoreEl.textContent = String(bestScore);
-        localStorage.setItem(bestScoreKey, String(bestScore));
+      if (activePowerups.shield) {
+        activePowerups.shield = false;
+        shieldFlash = 0.3;
+        triggerShake(5);
+        // Push bird out of pipe
+        bird.x = p.x - HIT_R - 2;
+      } else {
+        killBird();
+        return;
       }
-      return;
     }
 
     if (!p.passed && p.x + PIPE_W < bird.x - HIT_R) {
       p.passed = true;
       score++;
+      combo++;
+      if (combo > maxCombo) maxCombo = combo;
       scoreEl.textContent = String(score);
       sfx.score();
+      // New personal best mid-run
+      if (score > bestScore && !newBestAchieved) {
+        newBestAchieved  = true;
+        newBestAnimTimer = 2.5;
+        spawnParticles(bird.x, bird.y, { count: 16, colors: ['#ffc857','#fff','#ffdd77'], speed: 100, life: 1.0 });
+      }
       if (score > bestScore) {
         bestScore = score;
         bestScoreEl.textContent = String(bestScore);
         localStorage.setItem(bestScoreKey, String(bestScore));
-        // Refresh leaderboard immediately when personal best is beaten
         fetchLeaderboard();
       }
     }
@@ -537,21 +885,71 @@ function update(dt) {
 
   pipes = pipes.filter(p => p.x > -PIPE_W - 40);
 
+  // Magnet effect
+  if (activePowerups.magnet > 0) {
+    for (const c of cans) {
+      if (c.collected) continue;
+      const dx = bird.x - c.x, dy = bird.y - c.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 90) {
+        c.x += (dx / dist) * 180 * dt;
+        c.y += (dy / dist) * 180 * dt;
+      }
+    }
+  }
+
   // Cans
   for (const c of cans) {
     if (c.collected) continue;
     c.x -= PIPE_SPEED * dt;
     const dx = bird.x - c.x, dy = bird.y - c.y;
-    if (dx * dx + dy * dy < (bird.r + CAN_R) * (bird.r + CAN_R)) {
+    if (dx * dx + dy * dy < (HIT_R + CAN_R) * (HIT_R + CAN_R)) {
       c.collected = true;
-      sessionCans++;
-      lifetimeCans++;
+      const mult = getCanMult();
+      const earned = mult;
+      sessionCans     += earned;
+      lifetimeCans    += earned;
+      challengeSessionCans += 1;
+      updateChallengeProgress('cans', 1);
       localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
       canCountEl.textContent = String(lifetimeCans);
       sfx.collect();
+      spawnParticles(c.x, c.y, { count: 6, colors: ['#ffc857','#fff','#ff6eb4'], speed: 60, life: 0.5 });
     }
   }
   cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
+
+  // Power-ups
+  for (const p of powerups) {
+    if (p.collected) continue;
+    p.x -= speed * dt;
+    const dx = bird.x - p.x, dy = bird.y - p.y;
+    if (dx * dx + dy * dy < (HIT_R + 12) * (HIT_R + 12)) {
+      p.collected = true;
+      if (p.type === 'magnet') {
+        activePowerups.magnet = 6;
+        showToast('🧲 Magnet activated! (6s)');
+      } else if (p.type === 'shield') {
+        activePowerups.shield = true;
+        showToast('🛡️ Shield activated!');
+      } else if (p.type === 'slow') {
+        activePowerups.slow = 5;
+        showToast('🐌 Slow-mo activated! (5s)');
+      }
+      spawnParticles(p.x, p.y, { count: 8, colors: ['#fff', '#ffc857'], speed: 70, life: 0.5 });
+    }
+  }
+  powerups = powerups.filter(p => !p.collected && p.x > -30);
+}
+
+function updateParticles(dt) {
+  for (const p of particles) {
+    p.x    += p.vx * dt;
+    p.y    += p.vy * dt;
+    p.vy   += 60 * dt; // slight gravity on particles
+    p.life -= dt;
+  }
+  particles = particles.filter(p => p.life > 0);
 }
 
 // ── Store ──────────────────────────────────────────────────────────────────────
@@ -600,7 +998,6 @@ function makeSkinCard(skin) {
   btn.disabled = btnDisabled;
   btn.addEventListener('click', () => handleSkinAction(skin.id));
 
-  // Try button for unowned skins
   if (!owned && skin.price > 0) {
     const tryBtn = document.createElement('button');
     tryBtn.type      = 'button';
@@ -685,10 +1082,8 @@ async function loadServerSkins() {
     const res  = await fetch(`/api/session/${sessionId}/skins`);
     const data = await res.json();
     if (!res.ok) return;
-    // Union server + local owned
     (data.ownedSkins || []).forEach(id => ownedSkins.add(id));
     localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
-    // Use server's equipped skin if we own it
     if (data.equippedSkin && ownedSkins.has(data.equippedSkin)) {
       equippedSkinId = data.equippedSkin;
       currentSkin    = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
@@ -702,6 +1097,51 @@ shopBtnEl.addEventListener('click', openStore);
 storeCloseBtnEl.addEventListener('click', closeStore);
 storeModalEl.addEventListener('pointerdown', (e) => { if (e.target === storeModalEl) closeStore(); });
 
+// Challenges modal
+if (challengesBtnEl) {
+  challengesBtnEl.addEventListener('click', () => {
+    renderChallengesModal();
+    challengesModalEl.classList.remove('hidden');
+  });
+}
+if (challengesCloseBtnEl) {
+  challengesCloseBtnEl.addEventListener('click', () => challengesModalEl.classList.add('hidden'));
+}
+if (challengesModalEl) {
+  challengesModalEl.addEventListener('pointerdown', (e) => {
+    if (e.target === challengesModalEl) challengesModalEl.classList.add('hidden');
+  });
+}
+
+// Share button
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    if (!sessionId) return;
+    shareBtn.disabled = true;
+    try {
+      await fetch(`/api/session/${sessionId}/share`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ score }),
+      });
+      showToast('Score shared to Discord! 🎉');
+    } catch (err) {
+      shareBtn.disabled = false;
+    }
+  });
+}
+
+// Pause button
+if (pauseBtnEl) {
+  pauseBtnEl.addEventListener('click', togglePause);
+}
+
+function togglePause() {
+  if (gameState !== 'playing') return;
+  paused = !paused;
+  if (pauseBtnEl) pauseBtnEl.textContent = paused ? '▶' : '⏸';
+}
+
 // ── Input ──────────────────────────────────────────────────────────────────────
 function flap() {
   const now = performance.now();
@@ -710,7 +1150,6 @@ function flap() {
   bird.vy = FLAP_VEL;
   sfx.flap();
   if (navigator.vibrate) navigator.vibrate(12);
-  // Cycle animation frame through owned poses in this skin's group
   if (animSkinList.length > 1) {
     animFrame = (animFrame + 1) % animSkinList.length;
   }
@@ -719,21 +1158,40 @@ function flap() {
 window.addEventListener('keydown', (e) => {
   if ((e.code === 'Space' || e.code === 'ArrowUp') && gameState === 'playing') {
     e.preventDefault();
+    if (paused) { togglePause(); return; }
     flap();
+    return;
+  }
+  if (e.code === 'Space' && gameState === 'playing' && paused) {
+    e.preventDefault();
+    togglePause();
   }
 });
 
-// pointerdown handles both mouse and touch — no need for a separate touchstart
 stageEl.addEventListener('pointerdown', (e) => {
+  // Tutorial advance
+  if (tutorialActive && (gameState === 'ready' || gameState === 'loading')) {
+    tutorialStep++;
+    if (tutorialStep >= 2) {
+      tutorialActive = false;
+      tutorialStep   = 0;
+      localStorage.setItem('mochi-bird-tutorial', 'done');
+    }
+    return;
+  }
+  if (gameState === 'countdown') {
+    e.preventDefault();
+    return;
+  }
   if (gameState === 'playing') {
     e.preventDefault();
+    if (paused) { togglePause(); return; }
     flap();
   }
 }, { passive: false });
 
 refreshBtn.addEventListener('click', () => fetchLeaderboard());
 
-// Auto-refresh leaderboard every 15 seconds
 setInterval(() => fetchLeaderboard(), 15000);
 
 window.addEventListener('resize', () => { applyLayout(); resize(); });
@@ -799,7 +1257,6 @@ function drawBuildings() {
       : 'rgba(200,170,230,0.38)';
     roundRect(bx, by, b.w, b.h + 2, 10);
     ctx.fill();
-    // windows
     ctx.fillStyle = 'rgba(255,255,255,0.28)';
     for (let wy = by + 10; wy < groundY - 14; wy += 18) {
       for (let wx = bx + 6; wx < bx + b.w - 10; wx += 13) {
@@ -823,7 +1280,6 @@ function drawClouds() {
     ctx.translate(c.x, c.y);
     ctx.scale(c.size, c.size);
 
-    // Body
     ctx.fillStyle = 'rgba(255,248,252,0.92)';
     ctx.beginPath();
     ctx.arc(0,   0,  20, 0, Math.PI * 2);
@@ -832,15 +1288,12 @@ function drawClouds() {
     ctx.arc(23,  9,  21, 0, Math.PI * 2);
     ctx.fill();
 
-    // Pink blush cheeks
     ctx.fillStyle = 'rgba(255,170,200,0.45)';
     ctx.beginPath(); ctx.ellipse(11,  8, 5.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(34,  8, 5.5, 3.5, 0, 0, Math.PI * 2); ctx.fill();
 
-    // Eyes
     ctx.fillStyle = '#5a3a2a';
     if (c.face === 1) {
-      // wink — left eye closed
       ctx.beginPath(); ctx.arc(17, 2, 2.8, 0, Math.PI * 2); ctx.fill();
       ctx.strokeStyle = '#5a3a2a'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(28, 2, 2.8, Math.PI, 0); ctx.stroke();
@@ -849,7 +1302,6 @@ function drawClouds() {
       ctx.beginPath(); ctx.arc(28, 2, 2.8, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Smile
     ctx.strokeStyle = '#5a3a2a'; ctx.lineWidth = 1.8; ctx.lineCap = 'round';
     ctx.beginPath(); ctx.arc(22.5, 4, 5, 0.15, Math.PI - 0.15); ctx.stroke();
 
@@ -861,43 +1313,33 @@ function drawPipe(x, y, w, h, isTop) {
   const collar = 18, collarX = x - 5, collarW = w + 10;
 
   if (isTop) {
-    // Body
     ctx.fillStyle = '#ff6eb4';
     roundRect(x, y, w, h - collar, 8); ctx.fill();
-    // Highlight
     ctx.fillStyle = 'rgba(255,200,230,0.5)';
     ctx.fillRect(x + 7, y, 9, h - collar);
-    // Collar
     ctx.fillStyle = '#d44a90';
     roundRect(collarX, y + h - collar, collarW, collar, 7); ctx.fill();
     ctx.fillStyle = '#ff6eb4';
     roundRect(collarX + 3, y + h - collar + 3, collarW - 6, collar - 5, 5); ctx.fill();
     ctx.fillStyle = 'rgba(255,200,230,0.4)';
     ctx.fillRect(collarX + 8, y + h - collar + 3, 9, collar - 5);
-    // Opening ellipse
     ctx.fillStyle = '#b83578';
     ctx.beginPath(); ctx.ellipse(x + w/2, y + h - collar + 5, w/2 - 3, 7, 0, 0, Math.PI * 2); ctx.fill();
-    // Heart
     if (h > 50) drawHeart(x + w/2, y + (h - collar) * 0.5, 5, 'rgba(255,210,230,0.75)');
 
   } else {
-    // Collar at top
     ctx.fillStyle = '#d44a90';
     roundRect(collarX, y, collarW, collar, 7); ctx.fill();
     ctx.fillStyle = '#ff6eb4';
     roundRect(collarX + 3, y + 3, collarW - 6, collar - 5, 5); ctx.fill();
     ctx.fillStyle = 'rgba(255,200,230,0.4)';
     ctx.fillRect(collarX + 8, y + 3, 9, collar - 5);
-    // Opening ellipse
     ctx.fillStyle = '#b83578';
     ctx.beginPath(); ctx.ellipse(x + w/2, y + collar - 5, w/2 - 3, 7, 0, 0, Math.PI * 2); ctx.fill();
-    // Body
     ctx.fillStyle = '#ff6eb4';
     roundRect(x, y + collar, w, h - collar, 8); ctx.fill();
-    // Highlight
     ctx.fillStyle = 'rgba(255,200,230,0.5)';
     ctx.fillRect(x + 7, y + collar, 9, h - collar);
-    // Heart
     if (h > 50) drawHeart(x + w/2, y + collar + (h - collar) * 0.5, 5, 'rgba(255,210,230,0.75)');
   }
 }
@@ -914,14 +1356,12 @@ function drawPipes() {
 function drawGround() {
   const y = H - GROUND_H;
 
-  // Main ground fill
   const g = ctx.createLinearGradient(0, y, 0, H);
   g.addColorStop(0, '#ff8fb8');
   g.addColorStop(1, '#ff6ea0');
   ctx.fillStyle = g;
   ctx.fillRect(0, y, W, GROUND_H);
 
-  // Scrolling scalloped border
   const scallop = 22;
   const offset  = bgOffset * 0.55 % scallop;
   ctx.fillStyle = '#ffb0d0';
@@ -937,7 +1377,6 @@ function drawGround() {
   ctx.closePath();
   ctx.fill();
 
-  // Tiny hearts along the scallop
   ctx.fillStyle = 'rgba(255,255,255,0.55)';
   for (let i = 0; i < count; i++) {
     const hx = -scallop + i * scallop - offset + scallop / 2;
@@ -946,11 +1385,34 @@ function drawGround() {
   }
 }
 
-function drawBird() {
-  const tilt = clamp(bird.vy / 400, -0.6, 0.8);
+function drawBird(overrideY, overrideTilt) {
+  const isStationary = (gameState === 'ready' || gameState === 'dead' || gameState === 'countdown');
+  const displayY = overrideY !== undefined ? overrideY
+    : isStationary ? bird.y + Math.sin(elapsedMs * 0.003) * 8
+    : bird.y;
+
+  let tilt;
+  if (overrideTilt !== undefined) {
+    tilt = overrideTilt;
+  } else if (gameState === 'dying') {
+    tilt = clamp(bird.vy / 300, -0.6, Math.PI);
+  } else {
+    tilt = clamp(bird.vy / 400, -0.6, 0.8);
+  }
+
   ctx.save();
-  ctx.translate(bird.x, bird.y);
+  ctx.translate(bird.x, displayY);
   ctx.rotate(tilt);
+
+  // Shield flash effect
+  if (shieldFlash > 0) {
+    ctx.globalAlpha = shieldFlash / 0.3;
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(0, 0, bird.r * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
 
   const displaySkin = (animSkinList.length > 1) ? animSkinList[animFrame] : currentSkin;
   const img = displaySkin?.img || currentSkin.img;
@@ -959,7 +1421,6 @@ function drawBird() {
     const displayW = displayH * (img.naturalWidth / img.naturalHeight);
     ctx.drawImage(img, -displayW / 2, -displayH * 0.52, displayW, displayH);
   } else {
-    // Geometric fallback while image loads
     ctx.fillStyle = '#ffd84d';
     ctx.beginPath();
     ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
@@ -979,24 +1440,19 @@ function drawCans() {
     const x = c.x, y = c.y, r = CAN_R;
     const h = r * 2.2;
 
-    // Body
     ctx.fillStyle = '#e8333a';
     roundRect(x - r, y - h / 2, r * 2, h, 3);
     ctx.fill();
 
-    // Top silver band
     ctx.fillStyle = '#c0c8d0';
     ctx.fillRect(x - r, y - h / 2, r * 2, h * 0.18);
 
-    // Bottom silver band
     ctx.fillStyle = '#c0c8d0';
     ctx.fillRect(x - r, y + h / 2 - h * 0.18, r * 2, h * 0.18);
 
-    // White highlight stripe
     ctx.fillStyle = 'rgba(255,255,255,0.28)';
     ctx.fillRect(x - r * 0.6, y - h / 2 + h * 0.18, r * 0.4, h * 0.64);
 
-    // Rim top ellipse
     ctx.fillStyle = '#a8b2ba';
     ctx.beginPath();
     ctx.ellipse(x, y - h / 2, r, r * 0.32, 0, 0, Math.PI * 2);
@@ -1004,8 +1460,242 @@ function drawCans() {
   }
 }
 
+function drawParticles() {
+  for (const p of particles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle   = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawPowerups() {
+  for (const p of powerups) {
+    if (p.collected) continue;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    // Glow
+    const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 16);
+    let col;
+    if (p.type === 'magnet')      col = '#ff6eb4';
+    else if (p.type === 'shield') col = '#4af0f0';
+    else                           col = '#c47aff';
+
+    glow.addColorStop(0, col + 'cc');
+    glow.addColorStop(1, col + '00');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(0, 0, 16, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Circle
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = 2;
+    ctx.fillStyle   = col + '44';
+    ctx.beginPath();
+    ctx.arc(0, 0, 12, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Label
+    ctx.fillStyle   = '#fff';
+    ctx.font        = '11px sans-serif';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    const label = p.type === 'magnet' ? '🧲' : p.type === 'shield' ? '🛡' : '🐌';
+    ctx.fillText(label, 0, 0);
+
+    ctx.restore();
+  }
+}
+
+function drawActivePowerupHUD() {
+  const items = [];
+  if (activePowerups.magnet > 0) items.push({ label: '🧲', timer: activePowerups.magnet, max: 6, col: '#ff6eb4' });
+  if (activePowerups.shield)     items.push({ label: '🛡', timer: 1, max: 1, col: '#4af0f0' });
+  if (activePowerups.slow > 0)   items.push({ label: '🐌', timer: activePowerups.slow, max: 5, col: '#c47aff' });
+
+  let ox = W / 2 - (items.length * 44) / 2;
+  for (const item of items) {
+    ctx.save();
+    ctx.translate(ox + 22, 50);
+    ctx.fillStyle   = 'rgba(0,0,0,0.45)';
+    roundRect(-20, -16, 40, 32, 8); ctx.fill();
+    ctx.fillStyle   = '#fff';
+    ctx.font        = '14px sans-serif';
+    ctx.textAlign   = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(item.label, 0, -2);
+    // Timer bar
+    const pct = item.timer / item.max;
+    ctx.fillStyle = 'rgba(255,255,255,0.2)';
+    roundRect(-16, 10, 32, 4, 2); ctx.fill();
+    ctx.fillStyle = item.col;
+    roundRect(-16, 10, 32 * pct, 4, 2); ctx.fill();
+    ctx.restore();
+    ox += 44;
+  }
+}
+
+function drawComboHUD() {
+  if (combo < 5) return;
+  ctx.save();
+  ctx.textAlign   = 'right';
+  ctx.textBaseline = 'top';
+  const pulse = 1 + Math.sin(elapsedMs * 0.008) * 0.06;
+  ctx.scale(1, 1);
+  ctx.font        = `bold ${Math.round(18 * pulse)}px "Trebuchet MS", sans-serif`;
+  ctx.fillStyle   = '#ffc857';
+  ctx.strokeStyle = '#a06000';
+  ctx.lineWidth   = 3;
+  ctx.strokeText(`🔥 ${combo}x`, W - 10, 54);
+  ctx.fillText(`🔥 ${combo}x`, W - 10, 54);
+  ctx.restore();
+}
+
+function drawNewBestBanner() {
+  if (!newBestAchieved || newBestAnimTimer <= 0) return;
+  const alpha = Math.min(1, newBestAnimTimer / 0.5);
+  const pulse = 1 + Math.sin(elapsedMs * 0.01) * 0.07;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  const fs = Math.round(28 * pulse);
+  ctx.font = `900 ${fs}px "Trebuchet MS", sans-serif`;
+  ctx.strokeStyle = '#b03070';
+  ctx.lineWidth   = 5;
+  ctx.strokeText('✨ NEW BEST!', W / 2, H * 0.22);
+  ctx.fillStyle   = '#ffc857';
+  ctx.fillText('✨ NEW BEST!', W / 2, H * 0.22);
+  ctx.restore();
+}
+
+function drawCountdown() {
+  if (gameState !== 'countdown') return;
+  ctx.save();
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+
+  const pulse = 1 + Math.sin(countdownTimer * Math.PI * 2) * 0.15;
+  const label = countdownVal <= 0 ? 'GO!' : String(countdownVal);
+  const fs    = Math.round(80 * pulse);
+
+  ctx.font        = `900 ${fs}px "Trebuchet MS", sans-serif`;
+  ctx.strokeStyle = '#ff69b4';
+  ctx.lineWidth   = 8;
+  ctx.lineJoin    = 'round';
+  ctx.strokeText(label, W / 2, H / 2);
+  ctx.fillStyle   = '#fff';
+  ctx.fillText(label, W / 2, H / 2);
+  ctx.restore();
+}
+
+function drawTutorial() {
+  if (!tutorialActive) return;
+  // semi-transparent overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+
+  if (tutorialStep === 0) {
+    ctx.font      = `bold 28px "Trebuchet MS", sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText('👆 Tap to flap!', W / 2, H / 2 - 20);
+
+    // Animated arrow
+    const ay = H / 2 + 30 + Math.sin(elapsedMs * 0.005) * 10;
+    ctx.font      = '36px sans-serif';
+    ctx.fillText('⬇', W / 2, ay);
+
+    ctx.font      = '14px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('Tap anywhere to continue', W / 2, H / 2 + 90);
+  } else {
+    ctx.font      = `bold 22px "Trebuchet MS", sans-serif`;
+    ctx.fillStyle = '#fff';
+    ctx.fillText('🥫 Collect cans to unlock', W / 2, H / 2 - 30);
+    ctx.fillText('skins in the Shop!', W / 2, H / 2 + 10);
+
+    ctx.font      = '14px "Trebuchet MS", sans-serif';
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.fillText('Tap to start', W / 2, H / 2 + 70);
+  }
+}
+
+function drawRunSparkline() {
+  if (runHistory.length < 2) return;
+  const sparkW = 120, sparkH = 50;
+  const sx = W / 2 - sparkW / 2;
+  const sy = H * 0.82;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(0,0,0,0.3)';
+  roundRect(sx - 6, sy - 22, sparkW + 12, sparkH + 30, 8);
+  ctx.fill();
+
+  ctx.font      = '11px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(`Last ${runHistory.length} runs`, W / 2, sy - 4);
+
+  const minV = Math.min(...runHistory);
+  const maxV = Math.max(...runHistory);
+  const range = Math.max(1, maxV - minV);
+  const step  = sparkW / (runHistory.length - 1);
+
+  ctx.strokeStyle = '#ffc857';
+  ctx.lineWidth   = 2;
+  ctx.beginPath();
+  runHistory.forEach((v, i) => {
+    const px = sx + i * step;
+    const py = sy + sparkH - ((v - minV) / range) * sparkH;
+    if (i === 0) ctx.moveTo(px, py);
+    else         ctx.lineTo(px, py);
+  });
+  ctx.stroke();
+
+  // Dots
+  ctx.fillStyle = '#fff';
+  runHistory.forEach((v, i) => {
+    const px = sx + i * step;
+    const py = sy + sparkH - ((v - minV) / range) * sparkH;
+    ctx.beginPath();
+    ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+function drawPauseOverlay() {
+  if (!paused) return;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign   = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font        = `900 48px "Trebuchet MS", sans-serif`;
+  ctx.strokeStyle = '#b03070';
+  ctx.lineWidth   = 6;
+  ctx.strokeText('PAUSED', W / 2, H / 2 - 20);
+  ctx.fillStyle   = '#fff';
+  ctx.fillText('PAUSED', W / 2, H / 2 - 20);
+
+  ctx.font      = '16px "Trebuchet MS", sans-serif';
+  ctx.fillStyle = 'rgba(255,255,255,0.65)';
+  ctx.fillText('tap or press Space to resume', W / 2, H / 2 + 24);
+}
+
 function drawDim() {
-  if (gameState === 'playing') return;
+  if (gameState === 'playing' || gameState === 'dying' || gameState === 'countdown') return;
   ctx.fillStyle = 'rgba(7,16,24,.10)';
   ctx.fillRect(0, 0, W, H);
 }
@@ -1027,20 +1717,16 @@ function roundRect(x, y, w, h, r) {
 
 // ── Startup screen ─────────────────────────────────────────────────────────────
 function drawStartupScreen() {
-  // Sky + sparkles
   drawSky();
   drawBuildings();
 
-  // Decorative pipes (static, flanking the scene)
   drawPipe(W * 0.04,        0, PIPE_W, H * 0.30, true);
   drawPipe(W - PIPE_W - W * 0.04, 0, PIPE_W, H * 0.22, true);
   drawPipe(W * 0.07,        H * 0.60, PIPE_W, H - GROUND_H - H * 0.60, false);
   drawPipe(W - PIPE_W - W * 0.07, H * 0.58, PIPE_W, H - GROUND_H - H * 0.58, false);
 
-  // Clouds (already drifting)
   drawClouds();
 
-  // Subtle rainbow arc
   ctx.save();
   ctx.strokeStyle = 'rgba(220,180,255,0.30)';
   ctx.lineWidth   = 28;
@@ -1049,16 +1735,13 @@ function drawStartupScreen() {
   ctx.stroke();
   ctx.restore();
 
-  // Ground
   drawGround();
 
-  // ── Title ──────────────────────────────────────────────────────────────────
   ctx.textAlign    = 'center';
   ctx.textBaseline = 'middle';
   const fs1 = clamp(W * 0.13, 28, 58);
   const titleY = H * 0.24;
 
-  // "MOCHI" line
   ctx.font        = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
   ctx.strokeStyle = '#b03070';
   ctx.lineWidth   = 8;
@@ -1067,7 +1750,6 @@ function drawStartupScreen() {
   ctx.fillStyle   = '#fff';
   ctx.fillText   ('MOCHI', W / 2, titleY - fs1 * 0.6);
 
-  // "BIRD" line
   const fs2 = clamp(W * 0.165, 34, 72);
   ctx.font        = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
   ctx.strokeStyle = '#b03070';
@@ -1076,30 +1758,25 @@ function drawStartupScreen() {
   ctx.fillStyle   = '#fff';
   ctx.fillText   ('BIRD', W / 2, titleY + fs2 * 0.55);
 
-  // Pink tint pass
   ctx.fillStyle = 'rgba(255,160,200,0.22)';
   ctx.font = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
   ctx.fillText('MOCHI', W / 2, titleY - fs1 * 0.6);
   ctx.font = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
   ctx.fillText('BIRD',  W / 2, titleY + fs2 * 0.55);
 
-  // Hearts flanking title
   drawHeart(W / 2 - fs2 * 1.05, titleY + fs2 * 0.55, 6, '#ff6eb4');
   drawHeart(W / 2 + fs2 * 1.05, titleY + fs2 * 0.55, 6, '#ff6eb4');
 
-  // Floating hearts scattered
   const t = elapsedMs / 1000;
   [[0.2, 0.38], [0.78, 0.30], [0.88, 0.52], [0.14, 0.55]].forEach(([rx, ry], i) => {
     const fy = H * ry - Math.sin(t * 0.9 + i * 1.4) * 7;
     drawHeart(W * rx, fy, 4 + (i % 2) * 2, 'rgba(255,120,180,0.65)');
   });
 
-  // ── Loading bar ────────────────────────────────────────────────────────────
   const barW = W * 0.62, barH = 20;
   const barX = W / 2 - barW / 2;
   const barY = H * 0.74;
 
-  // "LOADING..." label
   ctx.font        = `800 ${clamp(W * 0.048, 12, 18)}px "Trebuchet MS", Verdana, sans-serif`;
   ctx.strokeStyle = 'rgba(255,255,255,0.8)';
   ctx.lineWidth   = 4;
@@ -1107,20 +1784,17 @@ function drawStartupScreen() {
   ctx.fillStyle   = '#c04080';
   ctx.fillText   ('LOADING...', W / 2, barY - 16);
 
-  // Track
   ctx.fillStyle = 'rgba(255,255,255,0.28)';
-  roundRect(barX, barY, barW, barH, barH / 2); // fills
+  roundRect(barX, barY, barW, barH, barH / 2);
   ctx.strokeStyle = '#ff6eb4';
   ctx.lineWidth   = 2;
   ctx.stroke();
 
-  // Fill
   const fillW = Math.max(barH, (barW - 4) * startupProgress);
   const fg = ctx.createLinearGradient(barX, 0, barX + fillW, 0);
   fg.addColorStop(0, '#ffaad0');
   fg.addColorStop(1, '#ff5da0');
   ctx.fillStyle = fg;
-  // Clip fill inside track
   ctx.save();
   ctx.beginPath();
   const r2 = (barH - 4) / 2;
@@ -1130,7 +1804,6 @@ function drawStartupScreen() {
   ctx.fill();
   ctx.restore();
 
-  // Heart at fill tip
   if (startupProgress > 0.05) {
     drawHeart(barX + 2 + fillW - 4, barY + barH / 2, 5, '#fff');
   }
@@ -1146,6 +1819,16 @@ function loop(ts) {
 
   ctx.clearRect(0, 0, W, H);
 
+  // Apply screen shake
+  const doShake = shakeAmt > 0;
+  if (doShake) {
+    ctx.save();
+    const sx = (Math.random() - 0.5) * 2 * shakeAmt;
+    const sy = (Math.random() - 0.5) * 2 * shakeAmt;
+    ctx.translate(sx, sy);
+    shakeAmt = Math.max(0, shakeAmt - 1.2);
+  }
+
   if (gameState === 'loading') {
     drawStartupScreen();
   } else {
@@ -1154,10 +1837,41 @@ function loop(ts) {
     drawClouds();
     drawPipes();
     drawGround();
+    drawPowerups();
+    drawParticles();
     drawCans();
     drawBird();
     drawDim();
+
+    // HUD overlays
+    if (gameState === 'playing' || gameState === 'dying') {
+      drawActivePowerupHUD();
+      drawComboHUD();
+      drawNewBestBanner();
+    }
+
+    // Countdown overlay
+    if (gameState === 'countdown') {
+      drawCountdown();
+    }
+
+    // Pause overlay
+    if (gameState === 'playing') {
+      drawPauseOverlay();
+    }
+
+    // Dead state sparkline
+    if (gameState === 'dead') {
+      drawRunSparkline();
+    }
+
+    // Tutorial
+    if (tutorialActive && gameState === 'ready') {
+      drawTutorial();
+    }
   }
+
+  if (doShake) ctx.restore();
 
   requestAnimationFrame(loop);
 }
@@ -1187,24 +1901,21 @@ async function loadSession() {
   console.log('[boot] Starting session load...');
 
   try {
-    // Try to get Discord user ID from various sources (Discord Activity context)
     let discordUserId = null;
 
-    // Method 1: Try Discord native API (if available in Activity context)
     if (window.discord?.user?.id) {
       discordUserId = window.discord.user.id;
       console.log('[boot] Got Discord user ID from native API:', discordUserId);
     }
 
     if (!sessionId && !sessionToken) {
-      // Try to auto-link to pending Activity session (Discord Activity mode)
       try {
         console.log('[boot] No session params, trying to auto-link to pending Activity session');
         const res = await fetch('/api/session/pending-activity');
         const data = await res.json();
         if (res.ok && data.session) {
           sessionData = data.session;
-          sessionId = sessionData.id; // Set for score submission later
+          sessionId = sessionData.id;
           console.log('[boot] Auto-linked to Activity session:', sessionData.userTag);
         } else {
           throw new Error('No pending session');
@@ -1212,7 +1923,6 @@ async function loadSession() {
       } catch (err) {
         console.log('[boot] Could not auto-link to Activity:', err.message);
 
-        // If we have a Discord user ID, try fetching their latest session
         if (discordUserId) {
           try {
             console.log('[boot] Trying Discord user lookup:', discordUserId);
@@ -1229,17 +1939,17 @@ async function loadSession() {
             console.log('[boot] Could not load Discord user session:', err2.message);
             console.log('[boot] Using practice mode');
             bestScoreKey = 'mochi-bird-best-practice';
+            isPractice = true;
             signalReady(); fetchLeaderboard(); return;
           }
         } else {
-          // No user ID and no session params = practice mode
           console.log('[boot] No session found - using practice mode');
           bestScoreKey = 'mochi-bird-best-practice';
+          isPractice = true;
           signalReady(); fetchLeaderboard(); return;
         }
       }
     } else {
-      // Load existing session via ID or token
       let endpoint;
       if (sessionToken) {
         console.log('[boot] Loading session via token');
@@ -1288,16 +1998,22 @@ try {
   applyLayout();
   refreshAnimSkins();
   checkDailyBonus();
+  checkStreak();
+  initChallenges();
   console.log('[boot] Layout applied');
 
   resize();
   console.log('[boot] Canvas resized to', W, 'x', H);
 
-  // Start render loop immediately
+  // Check tutorial
+  if (!localStorage.getItem('mochi-bird-tutorial')) {
+    tutorialActive = true;
+    tutorialStep   = 0;
+  }
+
   console.log('[boot] Starting render loop');
   requestAnimationFrame(loop);
 
-  // Load session async
   console.log('[boot] Loading session');
   loadSession().catch(err => {
     console.error('[boot] Uncaught loadSession error:', err);
@@ -1307,7 +2023,6 @@ try {
 } catch (err) {
   console.error('[boot] Critical boot error:', err);
   statusEl.textContent = 'Critical Error: ' + err.message;
-  // Try to show error on canvas
   ctx.fillStyle = '#fff';
   ctx.font = '16px sans-serif';
   ctx.fillText('Error: ' + err.message, 20, 40);

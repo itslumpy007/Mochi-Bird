@@ -12,7 +12,7 @@ function parseScore(v) {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-export function createServer({ onScoreSubmitted } = {}) {
+export function createServer({ onScoreSubmitted, onShare } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json());
@@ -120,6 +120,16 @@ export function createServer({ onScoreSubmitted } = {}) {
     }
 
     return res.json({ ok: true, session: publicSession(completed), personalBest, leaderboard });
+  });
+
+  // Share score to Discord channel
+  app.post('/api/session/:id/share', async (req, res) => {
+    const s = getSession(req.params.id);
+    if (!s) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const score = parseScore(req.body.score);
+    if (score === null) return res.status(400).json({ ok: false, error: 'Invalid score' });
+    if (typeof onShare === 'function') await onShare({ session: s, score }).catch(() => {});
+    res.json({ ok: true });
   });
 
   // Leaderboard

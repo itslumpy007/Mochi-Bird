@@ -11,9 +11,8 @@ const guildId   = process.env.DISCORD_GUILD_ID;
 let bot = null;
 
 const app = createServer({
-  async onScoreSubmitted(payload) {
-    await bot?.notifyScore(payload);
-  },
+  async onScoreSubmitted(payload) { await bot?.notifyScore(payload); },
+  async onShare(payload)          { await bot?.shareScore(payload); },
 });
 
 app.listen(port, () => console.log(`Web server listening on ${baseUrl}`));
