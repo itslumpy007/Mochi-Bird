@@ -97,7 +97,11 @@ export function createServer({ onScoreSubmitted } = {}) {
   app.post('/api/session/:id/score', async (req, res) => {
     const s = getSession(req.params.id);
     if (!s)                       return res.status(404).json({ ok: false, error: 'Session not found or expired' });
-    if (s.status === 'completed') return res.status(409).json({ ok: false, error: 'Score already submitted' });
+
+    // Allow resubmission only if the new score is higher than the existing score
+    if (s.status === 'completed' && (req.body.score === null || Number(req.body.score) <= s.score)) {
+      return res.status(409).json({ ok: false, error: 'Score already submitted' });
+    }
 
     const score = parseScore(req.body.score);
     if (score === null) return res.status(400).json({ ok: false, error: 'Invalid score' });
