@@ -1763,9 +1763,16 @@ function drawBird(overrideY, overrideTilt) {
   const displaySkin = (animSkinList.length > 1) ? animSkinList[animFrame] : currentSkin;
   const img = displaySkin?.img || currentSkin.img;
   if (img && img.complete && img.naturalWidth > 0) {
-    const displayH = bird.r * 5;
+    const displayH = bird.r * 5.2;
     const displayW = displayH * (img.naturalWidth / img.naturalHeight);
-    ctx.drawImage(img, -displayW / 2, -displayH * 0.52, displayW, displayH);
+    // Circle-clip so any white/opaque background in the sprite is hidden
+    const clipR = bird.r * 2.3;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, clipR, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(img, -displayW / 2, -displayH * 0.48, displayW, displayH);
+    ctx.restore();
   } else {
     ctx.fillStyle = '#ffd84d';
     ctx.beginPath();
@@ -2102,116 +2109,150 @@ function drawIconBtn(icon, cx, cy, r, bg) {
 function drawMainMenu() {
   menuBtns = [];
 
-  // Background
+  // ── Background ────────────────────────────────────────────────
   drawSky();
   drawBuildings();
   drawClouds();
 
-  // Decorative pipes on sides
-  const pw = PIPE_W * 0.85;
-  drawPipe(W * 0.04 - pw / 2,        0, pw, H * 0.26, true);
-  drawPipe(W * 0.96 - pw / 2,        0, pw, H * 0.20, true);
-  drawPipe(W * 0.06 - pw / 2, H * 0.60, pw, H - GROUND_H - H * 0.60, false);
-  drawPipe(W * 0.94 - pw / 2, H * 0.58, pw, H - GROUND_H - H * 0.58, false);
+  // Slim decorative pipes — only top-hanging, kept narrow
+  const pw = PIPE_W * 0.70;
+  drawPipe(W * 0.02,            0, pw, H * 0.22, true);
+  drawPipe(W - pw - W * 0.02,   0, pw, H * 0.17, true);
 
   drawGround();
 
-  // ── Floating bird (left) ───────────────────────────────────────
-  const bobY     = H * 0.44 + Math.sin(elapsedMs * 0.003) * 10;
-  const birdImg  = (animSkinList.length > 1 ? animSkinList[animFrame] : currentSkin)?.img || currentSkin.img;
-  if (birdImg && birdImg.complete && birdImg.naturalWidth > 0) {
-    const dh = clamp(H * 0.14, 60, 90);
-    const dw = dh * (birdImg.naturalWidth / birdImg.naturalHeight);
-    ctx.drawImage(birdImg, W * 0.07, bobY - dh * 0.5, dw, dh);
-  }
+  // ── Title area (top 32% of canvas) ────────────────────────────
+  const titleCX = W / 2;
+  const titleCY = H * 0.16;
 
-  // ── Title cloud backdrop ───────────────────────────────────────
-  const titleCX = W / 2, titleCY = H * 0.22;
+  // Cloud backdrop
   ctx.save();
   ctx.translate(titleCX, titleCY);
-  ctx.fillStyle = 'rgba(255,238,250,0.82)';
+  ctx.fillStyle = 'rgba(255,238,250,0.84)';
   ctx.beginPath();
-  ctx.arc(0,   0,  52, 0, Math.PI * 2);
-  ctx.arc( 44,-12,  38, 0, Math.PI * 2);
-  ctx.arc(-44,-12,  38, 0, Math.PI * 2);
-  ctx.arc( 68,  8,  26, 0, Math.PI * 2);
-  ctx.arc(-68,  8,  26, 0, Math.PI * 2);
-  ctx.arc( 18,-36,  32, 0, Math.PI * 2);
-  ctx.arc(-18,-36,  32, 0, Math.PI * 2);
+  ctx.arc(0,   0,  48, 0, Math.PI * 2);
+  ctx.arc( 42,-10,  34, 0, Math.PI * 2);
+  ctx.arc(-42,-10,  34, 0, Math.PI * 2);
+  ctx.arc( 62,  6,  22, 0, Math.PI * 2);
+  ctx.arc(-62,  6,  22, 0, Math.PI * 2);
+  ctx.arc( 16,-32,  28, 0, Math.PI * 2);
+  ctx.arc(-16,-32,  28, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
 
-  // ── "MOCHI" ───────────────────────────────────────────────────
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const fs1 = clamp(W * 0.115, 24, 50);
-  ctx.font        = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
-  ctx.lineJoin    = 'round';
-  ctx.strokeStyle = '#c0387a'; ctx.lineWidth = 8;
-  ctx.strokeText('MOCHI', titleCX, titleCY - fs1 * 0.62);
-  ctx.fillStyle = '#fff'; ctx.fillText('MOCHI', titleCX, titleCY - fs1 * 0.62);
-  ctx.fillStyle = 'rgba(255,150,200,0.20)'; ctx.fillText('MOCHI', titleCX, titleCY - fs1 * 0.62);
+  ctx.lineJoin  = 'round';
 
-  // ── "BIRD" ────────────────────────────────────────────────────
-  const fs2 = clamp(W * 0.148, 30, 66);
-  ctx.font        = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
-  ctx.strokeStyle = '#8a4000'; ctx.lineWidth = 9;
-  ctx.strokeText('BIRD', titleCX, titleCY + fs2 * 0.58);
-  ctx.fillStyle = '#ffd84d'; ctx.fillText('BIRD', titleCX, titleCY + fs2 * 0.58);
-  ctx.fillStyle = 'rgba(255,220,50,0.22)'; ctx.fillText('BIRD', titleCX, titleCY + fs2 * 0.58);
+  // "MOCHI"
+  const fs1 = clamp(W * 0.105, 22, 46);
+  ctx.font = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#c0387a'; ctx.lineWidth = 7;
+  ctx.strokeText('MOCHI', titleCX, titleCY - fs1 * 0.60);
+  ctx.fillStyle = '#fff';
+  ctx.fillText('MOCHI', titleCX, titleCY - fs1 * 0.60);
 
-  // Flanking hearts
-  drawHeart(titleCX - fs2 * 1.1, titleCY + fs2 * 0.58, 5.5, '#ff6eb4');
-  drawHeart(titleCX + fs2 * 1.1, titleCY + fs2 * 0.58, 5.5, '#ff6eb4');
+  // "BIRD"
+  const fs2 = clamp(W * 0.135, 28, 58);
+  ctx.font = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#8a4000'; ctx.lineWidth = 8;
+  ctx.strokeText('BIRD', titleCX, titleCY + fs2 * 0.55);
+  ctx.fillStyle = '#ffd84d';
+  ctx.fillText('BIRD', titleCX, titleCY + fs2 * 0.55);
 
-  // Floating ambient hearts
+  drawHeart(titleCX - fs2 * 1.05, titleCY + fs2 * 0.55, 5, '#ff6eb4');
+  drawHeart(titleCX + fs2 * 1.05, titleCY + fs2 * 0.55, 5, '#ff6eb4');
+
+  // ── Bird portrait (between title and buttons) ─────────────────
+  const birdImg = (animSkinList.length > 1 ? animSkinList[animFrame] : currentSkin)?.img
+                  || currentSkin.img;
+  const birdCR  = clamp(W * 0.085, 26, 38); // portrait circle radius
+  const birdCX  = W / 2;
+  const birdCY  = H * 0.355 + Math.sin(elapsedMs * 0.003) * 5;
+
+  // Circle border/glow
+  ctx.save();
+  ctx.shadowColor  = 'rgba(255,110,180,0.55)';
+  ctx.shadowBlur   = 12;
+  ctx.fillStyle    = 'rgba(255,220,240,0.30)';
+  ctx.beginPath();
+  ctx.arc(birdCX, birdCY, birdCR + 4, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Draw sprite clipped to circle
+  if (birdImg && birdImg.complete && birdImg.naturalWidth > 0) {
+    const dh = birdCR * 4.2;
+    const dw = dh * (birdImg.naturalWidth / birdImg.naturalHeight);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(birdCX, birdCY, birdCR, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.drawImage(birdImg, birdCX - dw / 2, birdCY - dh * 0.48, dw, dh);
+    ctx.restore();
+  }
+
+  // Circle ring
+  ctx.strokeStyle = '#ff6eb4';
+  ctx.lineWidth   = 2.5;
+  ctx.beginPath();
+  ctx.arc(birdCX, birdCY, birdCR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Ambient floating hearts
   const t = elapsedMs / 1000;
-  [[0.18, 0.38], [0.80, 0.32], [0.88, 0.54], [0.12, 0.58]].forEach(([rx, ry], i) => {
-    drawHeart(W * rx, H * ry - Math.sin(t * 0.9 + i * 1.5) * 7, 4 + (i % 2) * 2, 'rgba(255,120,180,0.55)');
+  [[0.14, 0.42], [0.84, 0.36], [0.88, 0.56]].forEach(([rx, ry], i) => {
+    drawHeart(W * rx, H * ry - Math.sin(t * 0.9 + i * 1.6) * 6, 3.5, 'rgba(255,120,180,0.50)');
   });
 
-  // ── Menu buttons ──────────────────────────────────────────────
-  const btnW  = clamp(W * 0.60, 180, 280);
-  const btnH  = clamp(H * 0.076, 44, 60);
-  const playW = btnW * 1.06;
-  const playH = btnH * 1.20;
-  const btnX  = W / 2 - btnW / 2;
-  const gap   = btnH * 0.30;
-  let   by    = H * 0.47;
+  // ── Buttons (start at 43%, evenly spaced to leave room for icons) ─
+  const usableH  = (H - GROUND_H) * 0.98;  // canvas playable height
+  const btnZoneT = usableH * 0.43;          // buttons start here
+  const iconZoneH= clamp(W * 0.14, 48, 68); // space reserved for icon row
+  const btnZoneB = usableH - iconZoneH - 8;  // buttons end here
+  const totalBtnH= btnZoneB - btnZoneT;
 
-  // PLAY (bigger, pink)
-  drawMenuBtn('♥  PLAY', W / 2 - playW / 2, by, playW, playH, '#ff6eb4', '#a02060');
-  menuBtns.push({ id: 'play',      x: W/2 - playW/2, y: by, w: playW, h: playH });
-  by += playH + gap * 1.5;
+  const btnCount = 4;                        // PLAY, SHOP, BIRDIES, SETTINGS
+  const btnH     = clamp(totalBtnH / (btnCount + 0.8), 38, 54);
+  const gap      = (totalBtnH - btnH * btnCount) / (btnCount - 1);
+  const btnW     = clamp(W * 0.60, 170, 270);
+  const btnX     = W / 2 - btnW / 2;
+  const playW    = btnW * 1.05;
+  let   by       = btnZoneT;
+
+  // PLAY
+  drawMenuBtn('♥  PLAY', W / 2 - playW / 2, by, playW, btnH * 1.12, '#ff6eb4', '#a02060');
+  menuBtns.push({ id: 'play',     x: W/2 - playW/2, y: by, w: playW, h: btnH * 1.12 });
+  by += btnH * 1.12 + gap;
 
   // SHOP
   drawMenuBtn('🛒  SHOP', btnX, by, btnW, btnH, '#c084fc', '#6030a0');
-  menuBtns.push({ id: 'shop',      x: btnX, y: by, w: btnW, h: btnH });
+  menuBtns.push({ id: 'shop',     x: btnX, y: by, w: btnW, h: btnH });
   by += btnH + gap;
 
-  // BIRDIES (skins)
+  // BIRDIES
   drawMenuBtn('🐦  BIRDIES', btnX, by, btnW, btnH, '#4dc8ff', '#1880b0');
-  menuBtns.push({ id: 'birdies',   x: btnX, y: by, w: btnW, h: btnH });
+  menuBtns.push({ id: 'birdies',  x: btnX, y: by, w: btnW, h: btnH });
   by += btnH + gap;
 
   // SETTINGS
   drawMenuBtn('⚙️  SETTINGS', btnX, by, btnW, btnH, '#ffb347', '#b06010');
-  menuBtns.push({ id: 'settings',  x: btnX, y: by, w: btnW, h: btnH });
+  menuBtns.push({ id: 'settings', x: btnX, y: by, w: btnW, h: btnH });
 
-  // ── Bottom icon circles ────────────────────────────────────────
-  const iconR  = clamp(W * 0.068, 22, 32);
-  const iconY  = H - GROUND_H - iconR - 12;
+  // ── Icon circles (sit between bottom of buttons and ground) ───
+  const iconR = clamp(W * 0.060, 20, 28);
+  const iconY = H - GROUND_H - iconR - 8;
 
-  drawIconBtn('🏆', W * 0.12,  iconY, iconR, '#ffc857');
-  menuBtns.push({ id: 'leaderboard', x: W*0.12 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+  drawIconBtn('🏆', W * 0.14,  iconY, iconR, '#ffc857');
+  menuBtns.push({ id: 'leaderboard', x: W*0.14 - iconR, y: iconY - iconR, w: iconR*2, h: iconR*2 });
 
-  drawIconBtn('📊', W * 0.26,  iconY, iconR, '#c084fc');
-  menuBtns.push({ id: 'stats',       x: W*0.26 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+  drawIconBtn('📊', W * 0.28,  iconY, iconR, '#c084fc');
+  menuBtns.push({ id: 'stats',       x: W*0.28 - iconR, y: iconY - iconR, w: iconR*2, h: iconR*2 });
 
-  drawIconBtn('🎯', W * 0.74,  iconY, iconR, '#ff6eb4');
-  menuBtns.push({ id: 'challenges',  x: W*0.74 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+  drawIconBtn('🎯', W * 0.72,  iconY, iconR, '#ff6eb4');
+  menuBtns.push({ id: 'challenges',  x: W*0.72 - iconR, y: iconY - iconR, w: iconR*2, h: iconR*2 });
 
-  drawIconBtn('🎁', W * 0.88,  iconY, iconR, '#4dc8ff');
-  menuBtns.push({ id: 'daily',       x: W*0.88 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+  drawIconBtn('🎁', W * 0.86,  iconY, iconR, '#4dc8ff');
+  menuBtns.push({ id: 'daily',       x: W*0.86 - iconR, y: iconY - iconR, w: iconR*2, h: iconR*2 });
 }
 
 function handleMenuClick(px, py) {
