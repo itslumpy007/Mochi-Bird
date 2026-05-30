@@ -1793,7 +1793,13 @@ function drawCans() {
     const x = c.x, y = c.y, r = CAN_R;
 
     if (canSprite.complete && canSprite.naturalWidth > 0) {
-      ctx.drawImage(canSprite, x - r * 2.0, y - r * 3.0, r * 4.0, r * 5.8);
+      const dw = r * 4.0, dh = r * 5.8;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(x, y, r * 2.0, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.drawImage(canSprite, x - dw / 2, y - dh * 0.50, dw, dh);
+      ctx.restore();
     } else {
       // Fallback geometric can
       const h = r * 2.2;
