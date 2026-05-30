@@ -305,6 +305,8 @@ function update(dt) {
         bestScore = score;
         bestScoreEl.textContent = String(bestScore);
         localStorage.setItem(bestScoreKey, String(bestScore));
+        // Refresh leaderboard immediately when personal best is beaten
+        fetchLeaderboard();
       }
     }
   }
