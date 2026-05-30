@@ -113,17 +113,18 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
   // ── Score notification helper ──────────────────────────────────────────────
   return {
     async notifyScore({ session, score, personalBest, leaderboard }) {
-      if (!session?.channelId) return;
+      if (!session?.userId) return;
       try {
-        const channel = await client.channels.fetch(session.channelId);
-        if (!channel?.isTextBased()) return;
+        // Send DM to the player only (not public in channel)
+        const user = await client.users.fetch(session.userId);
+        if (!user) return;
 
         const best     = personalBest?.bestScore ?? score;
         const topScore = leaderboard[0]?.bestScore;
         const rankLine = topScore != null ? `Top score: **${topScore}**` : '';
 
-        await channel.send({
-          content: `🐦 **${session.userTag}** just scored **${score}** in Mochi Bird! Personal best: **${best}**. ${rankLine}`.trim(),
+        await user.send({
+          content: `🐦 You scored **${score}** in Mochi Bird! Personal best: **${best}**. ${rankLine}`.trim(),
         });
       } catch (err) {
         console.warn('[bot] notifyScore failed:', err.message);
