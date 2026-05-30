@@ -11,7 +11,7 @@ import {
   Routes,
   SlashCommandBuilder,
 } from 'discord.js';
-import { buildPlayUrl, buildActivityUrl, createSession } from './state.js';
+import { buildPlayUrl, buildActivityUrl, createSession, createSessionToken } from './state.js';
 import { getLeaderboard }              from './leaderboard.js';
 
 // ── Command definitions ────────────────────────────────────────────────────────
@@ -52,11 +52,13 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           baseUrl,
         });
 
-        const playUrl = buildActivityUrl(baseUrl, session.id);
+        // Discord Activity proxy strips query parameters, use full URL with hash fragment
+        // Hash fragments are client-side only and accessible via location.hash
+        const activityUrl = `${baseUrl}/play#${session.id}`;
 
         const embed = new EmbedBuilder()
           .setTitle('Mochi Bird 🐦')
-          .setDescription('Your run is ready! Tap the button below to open the game. Only you can see this.')
+          .setDescription('Your run is ready! Tap the button below to open the Activity.')
           .addFields(
             { name: 'Player',  value: interaction.user.tag, inline: true },
             { name: 'Session', value: session.id.slice(0, 8) + '…', inline: true },
@@ -67,7 +69,7 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           new ButtonBuilder()
             .setLabel('Play Mochi Bird')
             .setStyle(ButtonStyle.Link)
-            .setURL(playUrl),
+            .setURL(finalUrl),
         );
 
         await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [embed], components: [row] });

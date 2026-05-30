@@ -53,6 +53,12 @@ let bgOffset = 0, spawnTimer = 0, elapsedMs = 0, score = 0, bestScore = 0;
 const params = new URLSearchParams(location.search);
 let sessionId = params.get('sid');
 let sessionToken = params.get('token');
+
+// For Discord Activities, sessionId may be in hash fragment (not stripped by proxy)
+if (!sessionId && !sessionToken && location.hash) {
+  sessionId = location.hash.slice(1); // Remove # prefix
+}
+
 let isPractice = !sessionId && !sessionToken;
 let sessionData = null;
 let lbEntries = [];
@@ -508,30 +514,78 @@ async function loadSession() {
   console.log('[boot] Starting session load...');
 
   try {
+    // Try to get Discord user ID from various sources (Discord Activity context)
+    let discordUserId = null;
+
+    // Method 1: Try Discord native API (if available in Activity context)
+    if (window.discord?.user?.id) {
+      discordUserId = window.discord.user.id;
+      console.log('[boot] Got Discord user ID from native API:', discordUserId);
+    }
+
     if (!sessionId && !sessionToken) {
-      // Practice mode
-      console.log('[boot] No session ID or token, using practice mode');
-      bestScoreKey = 'mochi-bird-best-practice';
-      setGameState('ready');
-      fetchLeaderboard();
-      return;
-    }
+      // Try to auto-link to pending Activity session (Discord Activity mode)
+      try {
+        console.log('[boot] No session params, trying to auto-link to pending Activity session');
+        const res = await fetch('/api/session/pending-activity');
+        const data = await res.json();
+        if (res.ok && data.session) {
+          sessionData = data.session;
+          sessionId = sessionData.id; // Set for score submission later
+          console.log('[boot] Auto-linked to Activity session:', sessionData.userTag);
+        } else {
+          throw new Error('No pending session');
+        }
+      } catch (err) {
+        console.log('[boot] Could not auto-link to Activity:', err.message);
 
-    // Load existing session
-    let endpoint;
-    if (sessionToken) {
-      console.log('[boot] Loading session via token (Activity mode)');
-      endpoint = `/api/session-by-token/${sessionToken}`;
+        // If we have a Discord user ID, try fetching their latest session
+        if (discordUserId) {
+          try {
+            console.log('[boot] Trying Discord user lookup:', discordUserId);
+            const res = await fetch(`/api/session/current/${discordUserId}`);
+            const data = await res.json();
+            if (res.ok && data.session) {
+              sessionData = data.session;
+              sessionId = sessionData.id;
+              console.log('[boot] Loaded session for Discord user');
+            } else {
+              throw new Error('No user session');
+            }
+          } catch (err2) {
+            console.log('[boot] Could not load Discord user session:', err2.message);
+            console.log('[boot] Using practice mode');
+            bestScoreKey = 'mochi-bird-best-practice';
+            setGameState('ready');
+            fetchLeaderboard();
+            return;
+          }
+        } else {
+          // No user ID and no session params = practice mode
+          console.log('[boot] No session found - using practice mode');
+          bestScoreKey = 'mochi-bird-best-practice';
+          setGameState('ready');
+          fetchLeaderboard();
+          return;
+        }
+      }
     } else {
-      console.log('[boot] Loading session:', sessionId);
-      endpoint = `/api/session/${sessionId}`;
+      // Load existing session via ID or token
+      let endpoint;
+      if (sessionToken) {
+        console.log('[boot] Loading session via token');
+        endpoint = `/api/session-by-token/${sessionToken}`;
+      } else {
+        console.log('[boot] Loading session:', sessionId);
+        endpoint = `/api/session/${sessionId}`;
+      }
+
+      const res = await fetch(endpoint);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      sessionData = data.session;
     }
 
-    const res = await fetch(endpoint);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error);
-
-    sessionData = data.session;
     bestScoreKey = `mochi-bird-best-${sessionData.userId}`;
 
     try {

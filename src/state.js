@@ -3,6 +3,8 @@ import { randomUUID, randomBytes } from 'node:crypto';
 const TTL_MS   = Number(process.env.SESSION_TTL_MINUTES || 240) * 60 * 1000; // 4 hours by default
 const sessions = new Map();
 const tokens   = new Map(); // Map of token -> sessionId
+const userSessions = new Map(); // Map of userId -> sessionId (latest session for each user)
+let lastCreatedSession = null; // Track most recent session for Activity linking
 
 function now() { return Date.now(); }
 
@@ -26,6 +28,10 @@ export function createSession({ userId, userTag, channelId, guildId = '', baseUr
     submittedAt: null,
   };
   sessions.set(id, session);
+  // Store latest session for this user
+  userSessions.set(userId, id);
+  // Track most recent session for Activity auto-linking (expires in 30 seconds)
+  lastCreatedSession = { session, expiresAt: createdAt + 30000 };
   return session;
 }
 
@@ -69,6 +75,24 @@ export function getSessionByToken(token) {
   if (!sessionId) return null;
   const session = sessions.get(sessionId);
   return session ?? null;
+}
+
+export function getLatestSessionForUser(userId) {
+  prune();
+  const sessionId = userSessions.get(userId);
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  return session ?? null;
+}
+
+export function getPendingActivitySession() {
+  if (!lastCreatedSession) return null;
+  // Check if the auto-link window has expired (30 seconds)
+  if (now() > lastCreatedSession.expiresAt) {
+    lastCreatedSession = null;
+    return null;
+  }
+  return lastCreatedSession.session;
 }
 
 export function buildPlayUrl(baseUrl, sessionId) {
