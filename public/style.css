@@ -584,7 +584,12 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .challenge-done     { color: var(--accent); font-weight: 800; }
 
 /* ── Store filters ─────────────────────────────────────────────── */
-.store-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.store-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
 .store-filter-btn { background: rgba(255,255,255,.06); color: var(--muted); box-shadow: none; border: 1px solid rgba(255,255,255,.08); min-width: 0; padding: 5px 10px; font-size: .75rem; min-height: 30px; border-radius: 999px; cursor: pointer; }
 .store-filter-btn.active { background: rgba(255,110,180,.2); color: #ff6eb4; border-color: rgba(255,110,180,.4); }
 
@@ -611,3 +616,32 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 
 /* ── Leaderboard rank note ─────────────────────────────────────── */
 .lb-rank-note { font-size: .78rem; color: var(--muted); text-align: center; margin-top: 8px; font-style: italic; }
+
+@media (max-width: 699px) {
+  .store-panel {
+    width: min(100%, 560px);
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 18px 16px 22px;
+  }
+
+  .store-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 4px;
+    margin-right: -8px;
+    scrollbar-width: none;
+  }
+
+  .store-filters::-webkit-scrollbar {
+    display: none;
+  }
+
+  .store-filter-btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
