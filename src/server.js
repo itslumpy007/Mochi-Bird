@@ -36,7 +36,7 @@ export function createServer({ onScoreSubmitted } = {}) {
   app.get('/game-v2.js', (_req, res) => res.sendFile(path.join(publicDir, 'game.js')));
 
   // Health
-  app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime() }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, uptime: process.uptime(), version: '2026-05-30-fc0e622' }));
 
   // Debug: Log request headers (to see if Discord sends user info)
   app.get('/api/debug-headers', (req, res) => {
