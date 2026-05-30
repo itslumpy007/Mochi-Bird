@@ -76,6 +76,19 @@ function makeSheetSkin(id, name, price, col, row) {
   return { id, name, price, src: null, img: null, sheet: bobaSheet, col, row, sheetCols: 4, sheetRows: 2 };
 }
 
+function drawCroppedImage(ctx2d, img, x, y, w, h, inset = 2) {
+  const sw = Math.max(1, img.naturalWidth - inset * 2);
+  const sh = Math.max(1, img.naturalHeight - inset * 2);
+  ctx2d.drawImage(img, inset, inset, sw, sh, x, y, w, h);
+}
+
+function drawCroppedSheet(ctx2d, sheet, sx, sy, sw, sh, x, y, w, h, inset = 2) {
+  const crop = Math.min(inset, Math.max(0, Math.floor(Math.min(sw, sh) / 6)));
+  const csw = Math.max(1, sw - crop * 2);
+  const csh = Math.max(1, sh - crop * 2);
+  ctx2d.drawImage(sheet, sx + crop, sy + crop, csw, csh, x, y, w, h);
+}
+
 function pad(n) { return String(n).padStart(2, '0'); }
 
 const SKIN_GROUPS = [
@@ -1320,7 +1333,7 @@ function makeSkinCard(skin) {
       const sx = skin.col * sw, sy = skin.row * sh;
       const scale = Math.min(80 / sw, 100 / sh);
       const dw = sw * scale, dh = sh * scale;
-      c.drawImage(sheet, sx, sy, sw, sh, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
+      drawCroppedSheet(c, sheet, sx, sy, sw, sh, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
     } else if (skin.img) {
       // Regular sprite — circle-clip to hide any solid background
       const img = skin.img;
@@ -1335,7 +1348,7 @@ function makeSkinCard(skin) {
       c.beginPath();
       c.arc(40, 50, 36, 0, Math.PI * 2);
       c.clip();
-      c.drawImage(img, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
+      drawCroppedImage(c, img, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
       c.restore();
       // Subtle ring
       c.strokeStyle = 'rgba(255,255,255,0.12)';
@@ -2068,7 +2081,7 @@ function drawBird(overrideY, overrideTilt) {
     const displayW = displayH * (effectiveImg.naturalWidth / effectiveImg.naturalHeight);
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, clipR, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(effectiveImg, -displayW / 2, -displayH * 0.48, displayW, displayH);
+    drawCroppedImage(ctx, effectiveImg, -displayW / 2, -displayH * 0.48, displayW, displayH);
     ctx.restore();
   } else if (displaySkin?.sheet?.complete && displaySkin.sheet.naturalWidth > 0) {
     // Sprite-sheet skin (boba tea etc.)
@@ -2080,7 +2093,7 @@ function drawBird(overrideY, overrideTilt) {
     const displayW = displayH * (sw / sh);
     ctx.save();
     ctx.beginPath(); ctx.arc(0, 0, clipR, 0, Math.PI * 2); ctx.clip();
-    ctx.drawImage(sheet, sx, sy, sw, sh, -displayW / 2, -displayH * 0.48, displayW, displayH);
+    drawCroppedSheet(ctx, sheet, sx, sy, sw, sh, -displayW / 2, -displayH * 0.48, displayW, displayH);
     ctx.restore();
   } else {
     ctx.fillStyle = '#ffd84d';
@@ -2576,7 +2589,7 @@ function drawMainMenu() {
     ctx.beginPath();
     ctx.arc(birdCX, birdCY, birdCR, 0, Math.PI * 2);
     ctx.clip();
-    ctx.drawImage(birdImg, birdCX - dw / 2, birdCY - dh * 0.48, dw, dh);
+    drawCroppedImage(ctx, birdImg, birdCX - dw / 2, birdCY - dh * 0.48, dw, dh);
     ctx.restore();
   }
 
@@ -2814,7 +2827,7 @@ function drawHellStartupScreen() {
     const by = H * 0.28 + Math.sin(elapsedMs * 0.003) * 8;
     ctx.save();
     ctx.beginPath(); ctx.arc(W/2, by + dh*0.5, dh*0.5, 0, Math.PI*2); ctx.clip();
-    ctx.drawImage(hellBirdImg, bx, by, dw, dh);
+    drawCroppedImage(ctx, hellBirdImg, bx, by, dw, dh);
     ctx.restore();
   }
 
@@ -2899,7 +2912,7 @@ function drawHellMenu() {
     const dh=birdCR*4.2, dw=dh*(hellBirdImg.naturalWidth/hellBirdImg.naturalHeight);
     ctx.save();
     ctx.beginPath(); ctx.arc(birdCX,birdCY,birdCR,0,Math.PI*2); ctx.clip();
-    ctx.drawImage(hellBirdImg,birdCX-dw/2,birdCY-dh*0.48,dw,dh);
+    drawCroppedImage(ctx, hellBirdImg,birdCX-dw/2,birdCY-dh*0.48,dw,dh);
     ctx.restore();
   }
   ctx.strokeStyle='#ff4400'; ctx.lineWidth=2.5;
