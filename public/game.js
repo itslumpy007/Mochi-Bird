@@ -143,7 +143,7 @@ function applyLayout() {
 }
 
 // ── Game state (single source of truth) ──────────────────────────────────────
-// Explicit states: 'loading' | 'ready' | 'countdown' | 'playing' | 'dying' | 'dead' | 'error'
+// Explicit states: 'loading' | 'menu' | 'ready' | 'countdown' | 'playing' | 'dying' | 'dead' | 'error'
 let gameState = 'loading';
 
 let bird = { x: 100, y: 270, r: 14, vy: 0 };
@@ -155,6 +155,9 @@ let buildings = [];
 let startupProgress = 0;
 let startupReady    = false;
 let pendingReady    = false;
+
+// ── Main menu ─────────────────────────────────────────────────────────────────
+let menuBtns = []; // populated each frame during 'menu' state
 
 // ── Screen shake ──────────────────────────────────────────────────────────────
 let shakeAmt = 0;
@@ -544,10 +547,16 @@ function updateUI() {
 
   switch (gameState) {
     case 'loading':
-      hideOverlay();   // canvas draws the startup screen
+      hideOverlay();
       statusEl.textContent = 'Loading...';
       startBtn.disabled = true;
       shopBtnEl.disabled = true;
+      break;
+
+    case 'menu':
+      hideOverlay(); // canvas draws the main menu
+      startBtn.disabled = true;
+      shopBtnEl.disabled = false;
       break;
 
     case 'ready':
@@ -607,9 +616,8 @@ startBtn.addEventListener('click', () => {
   }
 
   if (gameState === 'dead') {
-    // Reset and go back to ready
     resetGame();
-    setGameState('ready');
+    setGameState('menu');
     return;
   }
 
@@ -899,7 +907,7 @@ function update(dt) {
     startupProgress = Math.min(startupProgress, target);
     if (pendingReady && startupProgress >= 0.99) {
       pendingReady = false;
-      setGameState('ready');
+      setGameState('menu');
       return;
     }
     for (const c of clouds) {
@@ -1483,8 +1491,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 stageEl.addEventListener('pointerdown', (e) => {
-  // Tutorial advance
-  if (tutorialActive && (gameState === 'ready' || gameState === 'loading')) {
+  // Tutorial advance (but not if tutorial is blocking — let menu clicks through after tutorial)
+  if (tutorialActive && (gameState === 'menu' || gameState === 'ready' || gameState === 'loading')) {
     tutorialStep++;
     if (tutorialStep >= 2) {
       tutorialActive = false;
@@ -1493,6 +1501,16 @@ stageEl.addEventListener('pointerdown', (e) => {
     }
     return;
   }
+
+  // Main menu hit-testing
+  if (gameState === 'menu') {
+    const rect = canvas.getBoundingClientRect();
+    const px   = (e.clientX - rect.left) * (W / rect.width);
+    const py   = (e.clientY - rect.top)  * (H / rect.height);
+    handleMenuClick(px, py);
+    return;
+  }
+
   if (gameState === 'countdown') {
     e.preventDefault();
     return;
@@ -1700,7 +1718,7 @@ function drawGround() {
 }
 
 function drawBird(overrideY, overrideTilt) {
-  const isStationary = (gameState === 'ready' || gameState === 'dead' || gameState === 'countdown');
+  const isStationary = (gameState === 'menu' || gameState === 'ready' || gameState === 'dead' || gameState === 'countdown');
   const displayY = overrideY !== undefined ? overrideY
     : isStationary ? bird.y + Math.sin(elapsedMs * 0.003) * 8
     : bird.y;
@@ -2044,6 +2062,197 @@ function roundRect(x, y, w, h, r) {
   ctx.fill();
 }
 
+// ── Main menu ──────────────────────────────────────────────────────────────────
+function drawMenuBtn(label, x, y, w, h, bg, shadow) {
+  const r = h / 2;
+  // Drop shadow
+  ctx.fillStyle = shadow || 'rgba(0,0,0,0.22)';
+  roundRect(x + 2, y + 5, w, h, r);
+  // Body
+  ctx.fillStyle = bg;
+  roundRect(x, y, w, h, r);
+  // Top highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  roundRect(x + 4, y + 4, w - 8, h * 0.42, r * 0.6);
+  // Label
+  const fs = clamp(h * 0.40, 14, 20);
+  ctx.font        = `800 ${fs}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.fillStyle   = '#fff';
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth   = 3;
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.strokeText(label, x + w / 2, y + h / 2 + 1);
+  ctx.fillText  (label, x + w / 2, y + h / 2);
+}
+
+function drawIconBtn(icon, cx, cy, r, bg) {
+  ctx.fillStyle = 'rgba(0,0,0,0.20)';
+  ctx.beginPath(); ctx.arc(cx + 1, cy + 3, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = 'rgba(255,255,255,0.30)';
+  ctx.beginPath(); ctx.arc(cx - r * 0.22, cy - r * 0.25, r * 0.58, 0, Math.PI * 2); ctx.fill();
+  ctx.font = `${r * 0.92}px sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(icon, cx, cy + r * 0.06);
+}
+
+function drawMainMenu() {
+  menuBtns = [];
+
+  // Background
+  drawSky();
+  drawBuildings();
+  drawClouds();
+
+  // Decorative pipes on sides
+  const pw = PIPE_W * 0.85;
+  drawPipe(W * 0.04 - pw / 2,        0, pw, H * 0.26, true);
+  drawPipe(W * 0.96 - pw / 2,        0, pw, H * 0.20, true);
+  drawPipe(W * 0.06 - pw / 2, H * 0.60, pw, H - GROUND_H - H * 0.60, false);
+  drawPipe(W * 0.94 - pw / 2, H * 0.58, pw, H - GROUND_H - H * 0.58, false);
+
+  drawGround();
+
+  // ── Floating bird (left) ───────────────────────────────────────
+  const bobY     = H * 0.44 + Math.sin(elapsedMs * 0.003) * 10;
+  const birdImg  = (animSkinList.length > 1 ? animSkinList[animFrame] : currentSkin)?.img || currentSkin.img;
+  if (birdImg && birdImg.complete && birdImg.naturalWidth > 0) {
+    const dh = clamp(H * 0.14, 60, 90);
+    const dw = dh * (birdImg.naturalWidth / birdImg.naturalHeight);
+    ctx.drawImage(birdImg, W * 0.07, bobY - dh * 0.5, dw, dh);
+  }
+
+  // ── Title cloud backdrop ───────────────────────────────────────
+  const titleCX = W / 2, titleCY = H * 0.22;
+  ctx.save();
+  ctx.translate(titleCX, titleCY);
+  ctx.fillStyle = 'rgba(255,238,250,0.82)';
+  ctx.beginPath();
+  ctx.arc(0,   0,  52, 0, Math.PI * 2);
+  ctx.arc( 44,-12,  38, 0, Math.PI * 2);
+  ctx.arc(-44,-12,  38, 0, Math.PI * 2);
+  ctx.arc( 68,  8,  26, 0, Math.PI * 2);
+  ctx.arc(-68,  8,  26, 0, Math.PI * 2);
+  ctx.arc( 18,-36,  32, 0, Math.PI * 2);
+  ctx.arc(-18,-36,  32, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // ── "MOCHI" ───────────────────────────────────────────────────
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const fs1 = clamp(W * 0.115, 24, 50);
+  ctx.font        = `900 ${fs1}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.lineJoin    = 'round';
+  ctx.strokeStyle = '#c0387a'; ctx.lineWidth = 8;
+  ctx.strokeText('MOCHI', titleCX, titleCY - fs1 * 0.62);
+  ctx.fillStyle = '#fff'; ctx.fillText('MOCHI', titleCX, titleCY - fs1 * 0.62);
+  ctx.fillStyle = 'rgba(255,150,200,0.20)'; ctx.fillText('MOCHI', titleCX, titleCY - fs1 * 0.62);
+
+  // ── "BIRD" ────────────────────────────────────────────────────
+  const fs2 = clamp(W * 0.148, 30, 66);
+  ctx.font        = `900 ${fs2}px "Trebuchet MS", Verdana, sans-serif`;
+  ctx.strokeStyle = '#8a4000'; ctx.lineWidth = 9;
+  ctx.strokeText('BIRD', titleCX, titleCY + fs2 * 0.58);
+  ctx.fillStyle = '#ffd84d'; ctx.fillText('BIRD', titleCX, titleCY + fs2 * 0.58);
+  ctx.fillStyle = 'rgba(255,220,50,0.22)'; ctx.fillText('BIRD', titleCX, titleCY + fs2 * 0.58);
+
+  // Flanking hearts
+  drawHeart(titleCX - fs2 * 1.1, titleCY + fs2 * 0.58, 5.5, '#ff6eb4');
+  drawHeart(titleCX + fs2 * 1.1, titleCY + fs2 * 0.58, 5.5, '#ff6eb4');
+
+  // Floating ambient hearts
+  const t = elapsedMs / 1000;
+  [[0.18, 0.38], [0.80, 0.32], [0.88, 0.54], [0.12, 0.58]].forEach(([rx, ry], i) => {
+    drawHeart(W * rx, H * ry - Math.sin(t * 0.9 + i * 1.5) * 7, 4 + (i % 2) * 2, 'rgba(255,120,180,0.55)');
+  });
+
+  // ── Menu buttons ──────────────────────────────────────────────
+  const btnW  = clamp(W * 0.60, 180, 280);
+  const btnH  = clamp(H * 0.076, 44, 60);
+  const playW = btnW * 1.06;
+  const playH = btnH * 1.20;
+  const btnX  = W / 2 - btnW / 2;
+  const gap   = btnH * 0.30;
+  let   by    = H * 0.47;
+
+  // PLAY (bigger, pink)
+  drawMenuBtn('♥  PLAY', W / 2 - playW / 2, by, playW, playH, '#ff6eb4', '#a02060');
+  menuBtns.push({ id: 'play',      x: W/2 - playW/2, y: by, w: playW, h: playH });
+  by += playH + gap * 1.5;
+
+  // SHOP
+  drawMenuBtn('🛒  SHOP', btnX, by, btnW, btnH, '#c084fc', '#6030a0');
+  menuBtns.push({ id: 'shop',      x: btnX, y: by, w: btnW, h: btnH });
+  by += btnH + gap;
+
+  // BIRDIES (skins)
+  drawMenuBtn('🐦  BIRDIES', btnX, by, btnW, btnH, '#4dc8ff', '#1880b0');
+  menuBtns.push({ id: 'birdies',   x: btnX, y: by, w: btnW, h: btnH });
+  by += btnH + gap;
+
+  // SETTINGS
+  drawMenuBtn('⚙️  SETTINGS', btnX, by, btnW, btnH, '#ffb347', '#b06010');
+  menuBtns.push({ id: 'settings',  x: btnX, y: by, w: btnW, h: btnH });
+
+  // ── Bottom icon circles ────────────────────────────────────────
+  const iconR  = clamp(W * 0.068, 22, 32);
+  const iconY  = H - GROUND_H - iconR - 12;
+
+  drawIconBtn('🏆', W * 0.12,  iconY, iconR, '#ffc857');
+  menuBtns.push({ id: 'leaderboard', x: W*0.12 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+
+  drawIconBtn('📊', W * 0.26,  iconY, iconR, '#c084fc');
+  menuBtns.push({ id: 'stats',       x: W*0.26 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+
+  drawIconBtn('🎯', W * 0.74,  iconY, iconR, '#ff6eb4');
+  menuBtns.push({ id: 'challenges',  x: W*0.74 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+
+  drawIconBtn('🎁', W * 0.88,  iconY, iconR, '#4dc8ff');
+  menuBtns.push({ id: 'daily',       x: W*0.88 - iconR,  y: iconY - iconR, w: iconR*2, h: iconR*2 });
+}
+
+function handleMenuClick(px, py) {
+  for (const btn of menuBtns) {
+    if (px >= btn.x && px <= btn.x + btn.w && py >= btn.y && py <= btn.y + btn.h) {
+      switch (btn.id) {
+        case 'play':
+          countdownVal = 3; countdownTimer = 0;
+          setGameState('countdown');
+          startMusic();
+          break;
+        case 'shop':
+        case 'birdies':
+          openStore();
+          break;
+        case 'settings':
+          syncSettingsUI();
+          settingsModalEl.classList.remove('hidden');
+          break;
+        case 'stats':
+          renderStats();
+          statsModalEl.classList.remove('hidden');
+          break;
+        case 'challenges':
+          renderChallengesModal();
+          challengesModalEl.classList.remove('hidden');
+          break;
+        case 'leaderboard':
+          // Scroll into view on desktop, or just show a toast with info
+          lbTabAllEl?.click();
+          showToast('Check the leaderboard on the right →');
+          break;
+        case 'daily':
+          showToast(`🔥 Streak: Day ${streakCount}  •  🥫 ${lifetimeCans} cans`);
+          break;
+      }
+      return;
+    }
+  }
+}
+
 // ── Startup screen ─────────────────────────────────────────────────────────────
 function drawStartupScreen() {
   drawSky();
@@ -2160,6 +2369,9 @@ function loop(ts) {
 
   if (gameState === 'loading') {
     drawStartupScreen();
+  } else if (gameState === 'menu') {
+    drawMainMenu();
+    if (tutorialActive) drawTutorial();
   } else {
     drawSky();
     drawBuildings();
@@ -2195,7 +2407,7 @@ function loop(ts) {
     }
 
     // Tutorial
-    if (tutorialActive && gameState === 'ready') {
+    if (tutorialActive && (gameState === 'menu' || gameState === 'ready')) {
       drawTutorial();
     }
   }
@@ -2222,6 +2434,7 @@ function checkDailyBonus() {
 function signalReady() {
   startupReady  = true;
   pendingReady  = true;
+  // update() transitions to 'menu' (not 'ready') once bar reaches 1
 }
 
 async function loadSession() {
