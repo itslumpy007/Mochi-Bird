@@ -52,9 +52,10 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           baseUrl,
         });
 
-        // Discord Activity proxy strips query parameters, use full URL with hash fragment
-        // Hash fragments are client-side only and accessible via location.hash
-        const activityUrl = `${baseUrl}/play#${session.id}`;
+        // Use Discord Custom Link to launch as Activity (this is the proper way)
+        // The Custom Link URL tells Discord to open this as an Activity, not a browser tab
+        const customLinkUrl = 'https://www.discord.com/activities/1509315912216346715?link_id=0-1510122820447768646';
+        const activityUrl = customLinkUrl;
 
         const embed = new EmbedBuilder()
           .setTitle('Mochi Bird 🐦')
