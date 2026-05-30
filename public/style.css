@@ -434,6 +434,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   height: 100px;
   border-radius: 10px;
   flex-shrink: 0;
+  object-fit: contain;
   background: rgba(255,255,255,.03);
 }
 .skin-name {

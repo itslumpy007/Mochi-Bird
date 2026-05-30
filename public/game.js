@@ -437,38 +437,19 @@ function closeStore() {
   storeModalEl.classList.add('hidden');
 }
 
-function drawSkinPreview(canvas, skin) {
-  const c = canvas.getContext('2d');
-  const w = canvas.width, h = canvas.height;
-  c.clearRect(0, 0, w, h);
-  const img = skin.img;
-  if (img && img.complete && img.naturalWidth > 0) {
-    const aspect = img.naturalWidth / img.naturalHeight;
-    let dw = w, dh = w / aspect;
-    if (dh > h) { dh = h; dw = h * aspect; }
-    c.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
-  } else {
-    // retry once image loads
-    img.onload = () => drawSkinPreview(canvas, skin);
-    c.fillStyle = 'rgba(255,255,255,.06)';
-    c.beginPath();
-    c.arc(w / 2, h / 2, w / 2 - 4, 0, Math.PI * 2);
-    c.fill();
-  }
-}
-
 function makeSkinCard(skin) {
-  const owned    = ownedSkins.has(skin.id);
-  const equipped = skin.id === equippedSkinId;
+  const owned     = ownedSkins.has(skin.id);
+  const equipped  = skin.id === equippedSkinId;
   const canAfford = lifetimeCans >= skin.price;
 
   const card = document.createElement('div');
   card.className = 'skin-card' + (equipped ? ' equipped' : '');
 
-  const previewCanvas = document.createElement('canvas');
-  previewCanvas.width  = 80;
-  previewCanvas.height = 100;
-  previewCanvas.className = 'skin-preview';
+  const previewImg = document.createElement('img');
+  previewImg.className = 'skin-preview';
+  previewImg.src = skin.src;
+  previewImg.alt = skin.name;
+  previewImg.loading = 'lazy';
 
   const nameEl = document.createElement('div');
   nameEl.className = 'skin-name';
@@ -493,11 +474,9 @@ function makeSkinCard(skin) {
   btn.disabled = btnDisabled;
   btn.addEventListener('click', () => handleSkinAction(skin.id));
 
-  card.appendChild(previewCanvas);
+  card.appendChild(previewImg);
   card.appendChild(nameEl);
   card.appendChild(btn);
-
-  drawSkinPreview(previewCanvas, skin);
   return card;
 }
 
