@@ -53,9 +53,8 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           baseUrl,
         });
 
-        // Use Discord Custom Link to launch as Activity (this is the proper way)
-        // The Custom Link URL tells Discord to open this as an Activity, not a browser tab
-        const customLinkUrl = 'https://www.discord.com/activities/1509315912216346715?link_id=0-1510122820447768646';
+        // Use Discord Custom Link to launch as Activity with sessionId appended
+        const customLinkUrl = `https://www.discord.com/activities/1509315912216346715?link_id=0-1510122820447768646&sid=${session.id}`;
         const activityUrl = customLinkUrl;
 
         const embed = new EmbedBuilder()
