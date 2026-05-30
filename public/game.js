@@ -67,7 +67,7 @@ const SKIN_GROUPS = [
   {
     label: 'Default',
     desc: 'The original Mochi Bird',
-    skins: [ makeSkin('default', 'Default', 0, '/assets/avatar-v2.png') ],
+    skins: [ makeSkin('default', 'Default', 0, '/assets/cosmetics/hair-brown-01.png') ],
   },
   {
     label: 'Dr. Shelly',
@@ -1727,7 +1727,7 @@ function drawBird(overrideY, overrideTilt) {
   if (overrideTilt !== undefined) {
     tilt = overrideTilt;
   } else if (gameState === 'dying') {
-    tilt = clamp(bird.vy / 300, -0.6, Math.PI);
+    tilt = clamp(bird.vy / 300, -0.6, 0.8);
   } else {
     tilt = clamp(bird.vy / 400, -0.6, 0.8);
   }
@@ -1786,7 +1786,7 @@ function drawCans() {
     const x = c.x, y = c.y, r = CAN_R;
 
     if (canSprite.complete && canSprite.naturalWidth > 0) {
-      ctx.drawImage(canSprite, x - r * 1.4, y - r * 2, r * 2.8, r * 4);
+      ctx.drawImage(canSprite, x - r * 2.0, y - r * 3.0, r * 4.0, r * 5.8);
     } else {
       // Fallback geometric can
       const h = r * 2.2;
