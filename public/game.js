@@ -50,8 +50,10 @@ let clouds = [];
 let stars = [];
 let bgOffset = 0, spawnTimer = 0, elapsedMs = 0, score = 0, bestScore = 0;
 
-let sessionId = new URLSearchParams(location.search).get('sid');
-let isPractice = !sessionId;
+const params = new URLSearchParams(location.search);
+let sessionId = params.get('sid');
+let sessionToken = params.get('token');
+let isPractice = !sessionId && !sessionToken;
 let sessionData = null;
 let lbEntries = [];
 let bestScoreKey = 'mochi-bird-best-practice';
@@ -506,9 +508,9 @@ async function loadSession() {
   console.log('[boot] Starting session load...');
 
   try {
-    if (!sessionId) {
+    if (!sessionId && !sessionToken) {
       // Practice mode
-      console.log('[boot] No sessionId, using practice mode');
+      console.log('[boot] No session ID or token, using practice mode');
       bestScoreKey = 'mochi-bird-best-practice';
       setGameState('ready');
       fetchLeaderboard();
@@ -516,8 +518,16 @@ async function loadSession() {
     }
 
     // Load existing session
-    console.log('[boot] Loading session:', sessionId);
-    const res = await fetch(`/api/session/${sessionId}`);
+    let endpoint;
+    if (sessionToken) {
+      console.log('[boot] Loading session via token (Activity mode)');
+      endpoint = `/api/session-by-token/${sessionToken}`;
+    } else {
+      console.log('[boot] Loading session:', sessionId);
+      endpoint = `/api/session/${sessionId}`;
+    }
+
+    const res = await fetch(endpoint);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
 

@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
+import { randomUUID, randomBytes } from 'node:crypto';
 
 const TTL_MS   = Number(process.env.SESSION_TTL_MINUTES || 240) * 60 * 1000; // 4 hours by default
 const sessions = new Map();
+const tokens   = new Map(); // Map of token -> sessionId
 
 function now() { return Date.now(); }
 
@@ -55,8 +56,30 @@ export function publicSession(s) {
   };
 }
 
+export function createSessionToken(sessionId) {
+  // Generate a random 32-byte token
+  const token = randomBytes(32).toString('hex');
+  tokens.set(token, sessionId);
+  return token;
+}
+
+export function getSessionByToken(token) {
+  prune();
+  const sessionId = tokens.get(token);
+  if (!sessionId) return null;
+  const session = sessions.get(sessionId);
+  return session ?? null;
+}
+
 export function buildPlayUrl(baseUrl, sessionId) {
   const url = new URL('/play', baseUrl);
   url.searchParams.set('sid', sessionId);
+  return url.toString();
+}
+
+export function buildActivityUrl(baseUrl, sessionId) {
+  const token = createSessionToken(sessionId);
+  const url = new URL('/play', baseUrl);
+  url.searchParams.set('token', token);
   return url.toString();
 }

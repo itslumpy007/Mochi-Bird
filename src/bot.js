@@ -11,7 +11,7 @@ import {
   Routes,
   SlashCommandBuilder,
 } from 'discord.js';
-import { buildPlayUrl, createSession } from './state.js';
+import { buildPlayUrl, buildActivityUrl, createSession } from './state.js';
 import { getLeaderboard }              from './leaderboard.js';
 
 // ── Command definitions ────────────────────────────────────────────────────────
@@ -52,7 +52,7 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           baseUrl,
         });
 
-        const playUrl = buildPlayUrl(baseUrl, session.id);
+        const playUrl = buildActivityUrl(baseUrl, session.id);
 
         const embed = new EmbedBuilder()
           .setTitle('Mochi Bird 🐦')

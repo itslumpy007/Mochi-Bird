@@ -1,7 +1,7 @@
 import express from 'express';
 import path    from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { completeSession, createSession, getSession, publicSession } from './state.js';
+import { completeSession, createSession, getSession, publicSession, getSessionByToken } from './state.js';
 import { getLeaderboard, getPersonalBest, recordScore }              from './leaderboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,10 +31,17 @@ export function createServer({ onScoreSubmitted } = {}) {
     discordClientId: process.env.DISCORD_CLIENT_ID || null,
   }));
 
-  // Get session
+  // Get session by ID
   app.get('/api/session/:id', (req, res) => {
     const s = getSession(req.params.id);
     if (!s) return res.status(404).json({ ok: false, error: 'Session not found or expired' });
+    return res.json({ ok: true, session: publicSession(s) });
+  });
+
+  // Get session by token (for Discord Activity)
+  app.get('/api/session-by-token/:token', (req, res) => {
+    const s = getSessionByToken(req.params.token);
+    if (!s) return res.status(404).json({ ok: false, error: 'Token invalid or expired' });
     return res.json({ ok: true, session: publicSession(s) });
   });
 
