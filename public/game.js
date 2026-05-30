@@ -169,8 +169,14 @@ function renderLeaderboard(entries) {
   lbEntries.forEach((e, i) => {
     const li = document.createElement('li');
     li.className = 'lb-item' + (sessionData?.userId === e.userId ? ' me' : '');
+
+    const avatarHtml = e.avatarHash
+      ? `<img class="lb-avatar" src="https://cdn.discordapp.com/avatars/${e.userId}/${e.avatarHash}.png?size=32" alt="" loading="lazy">`
+      : `<span class="lb-avatar lb-avatar-fallback">${(e.userTag || '?')[0].toUpperCase()}</span>`;
+
     li.innerHTML = `
       <span class="lb-rank">${i + 1}</span>
+      ${avatarHtml}
       <span class="lb-name">${e.userTag || e.userId || 'Unknown'}</span>
       <span class="lb-score">${Number(e.bestScore) || 0}</span>
     `;

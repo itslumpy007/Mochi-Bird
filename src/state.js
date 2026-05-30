@@ -15,12 +15,12 @@ function prune() {
   }
 }
 
-export function createSession({ userId, userTag, channelId, guildId = '', baseUrl = '' }) {
+export function createSession({ userId, userTag, avatarHash = null, channelId, guildId = '', baseUrl = '' }) {
   prune();
   const id        = randomUUID();
   const createdAt = now();
   const session   = {
-    id, userId, userTag, channelId, guildId, baseUrl,
+    id, userId, userTag, avatarHash, channelId, guildId, baseUrl,
     createdAt,
     expiresAt:   createdAt + TTL_MS,
     status:      'active',
@@ -56,7 +56,7 @@ export function completeSession(id, { score, durationMs, reason }) {
 export function publicSession(s) {
   if (!s) return null;
   return {
-    id: s.id, userId: s.userId, userTag: s.userTag,
+    id: s.id, userId: s.userId, userTag: s.userTag, avatarHash: s.avatarHash ?? null,
     channelId: s.channelId, guildId: s.guildId,
     createdAt: s.createdAt, expiresAt: s.expiresAt,
     status: s.status, score: s.score, submittedAt: s.submittedAt,

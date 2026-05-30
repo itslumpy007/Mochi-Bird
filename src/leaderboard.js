@@ -40,7 +40,7 @@ function enqueuePersist() {
     .catch(err => console.warn('Leaderboard persist failed:', err.message));
 }
 
-export async function recordScore({ userId, userTag, score }) {
+export async function recordScore({ userId, userTag, avatarHash = null, score }) {
   // Always wait for previous writes to complete, then clear cache
   await writeQueue;
   cache = null;
@@ -48,7 +48,11 @@ export async function recordScore({ userId, userTag, score }) {
   const board    = await load();
   const existing = board.get(userId);
   const bestScore = existing ? Math.max(existing.bestScore, score) : score;
-  const entry    = { userId, userTag, bestScore, lastScore: score, updatedAt: new Date().toISOString() };
+  const entry    = {
+    userId, userTag,
+    avatarHash: avatarHash ?? existing?.avatarHash ?? null,
+    bestScore, lastScore: score, updatedAt: new Date().toISOString(),
+  };
   board.set(userId, entry);
   console.log(`[leaderboard] Recorded score for ${userTag}: ${score} (best: ${bestScore})`);
   enqueuePersist();

@@ -110,7 +110,7 @@ export function createServer({ onScoreSubmitted } = {}) {
     const reason     = typeof req.body.reason === 'string' ? req.body.reason : 'game_over';
 
     const completed    = completeSession(req.params.id, { score, durationMs, reason });
-    const personalBest = await recordScore({ userId: completed.userId, userTag: completed.userTag, score });
+    const personalBest = await recordScore({ userId: completed.userId, userTag: completed.userTag, avatarHash: completed.avatarHash, score });
     const leaderboard  = await getLeaderboard(10);
 
     if (typeof onScoreSubmitted === 'function') {

@@ -311,7 +311,7 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 
 .lb-item {
   display: grid;
-  grid-template-columns: 2rem 1fr auto;
+  grid-template-columns: 2rem 2rem 1fr auto;
   gap: 10px;
   align-items: center;
   padding: 10px 13px;
@@ -328,6 +328,17 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   font-weight: 800; font-size: .8rem;
   color: #031018;
   background: linear-gradient(135deg, var(--gold), #ffd978);
+}
+.lb-avatar {
+  width: 2rem; height: 2rem;
+  border-radius: 50%;
+  object-fit: cover;
+}
+.lb-avatar-fallback {
+  display: grid; place-items: center;
+  font-size: .75rem; font-weight: 800;
+  background: rgba(37,208,171,.22);
+  color: var(--accent);
 }
 .lb-name  { font-weight: 700; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-score { color: var(--gold); font-weight: 800; }
