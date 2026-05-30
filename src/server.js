@@ -80,8 +80,16 @@ export function createServer({ onScoreSubmitted } = {}) {
   // Returns the most recently created session if still within 5-minute window
   app.get('/api/session/pending-activity', (req, res) => {
     const s = getPendingActivitySession();
-    console.log('[api] /session/pending-activity called, result:', s ? `Found session for ${s.userTag}` : 'No pending session');
-    if (!s) return res.status(404).json({ ok: false, error: 'No pending activity session' });
+    const result = s ? `Found session for ${s.userTag}` : 'No pending session';
+    console.log('[api] /session/pending-activity called, result:', result);
+
+    if (!s) {
+      return res.status(404).json({
+        ok: false,
+        error: 'No pending activity session',
+        debug: { hasPendingSession: !!s, timestamp: new Date().toISOString() }
+      });
+    }
     return res.json({ ok: true, session: publicSession(s) });
   });
 
