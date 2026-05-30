@@ -69,7 +69,7 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
           new ButtonBuilder()
             .setLabel('Play Mochi Bird')
             .setStyle(ButtonStyle.Link)
-            .setURL(finalUrl),
+            .setURL(activityUrl),
         );
 
         await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [embed], components: [row] });
