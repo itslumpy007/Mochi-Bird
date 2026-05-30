@@ -343,14 +343,44 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .lb-name  { font-weight: 700; font-size: .9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-score { color: var(--gold); font-weight: 800; }
 
-/* ── Shop button in HUD ───────────────────────────────────────── */
-.shop-btn {
-  margin-left: 8px;
-  padding: 6px 12px;
-  font-size: .78rem;
+/* ── HUD safe-area + icon buttons ─────────────────────────────── */
+.hud {
+  padding-top:   max(10px, env(safe-area-inset-top));
+  padding-left:  max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+
+.shop-btn, .hud-icon-btn {
+  margin-left: 6px;
+  padding: 6px 10px;
+  font-size: .82rem;
   min-height: 34px;
   min-width: 0;
   flex-shrink: 0;
+}
+
+/* ── Toast ────────────────────────────────────────────────────── */
+.toast {
+  position: fixed;
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%) translateY(16px);
+  background: linear-gradient(135deg, #ff6eb4, #d44a90);
+  color: #fff;
+  padding: 10px 22px;
+  border-radius: 999px;
+  font-weight: 800;
+  font-size: .88rem;
+  opacity: 0;
+  transition: opacity .28s, transform .28s;
+  pointer-events: none;
+  z-index: 300;
+  white-space: nowrap;
+  box-shadow: 0 6px 20px rgba(212,74,144,.4);
+}
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 /* ── Store modal ──────────────────────────────────────────────── */
@@ -462,4 +492,13 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   box-shadow: none;
   border: 1px solid rgba(37,208,171,.4);
   cursor: default;
+}
+.skin-try {
+  background: rgba(255,110,180,.15);
+  color: #ff6eb4;
+  box-shadow: none;
+  border: 1px solid rgba(255,110,180,.3);
+  font-size: .68rem;
+  padding: 5px 8px;
+  min-height: 26px;
 }

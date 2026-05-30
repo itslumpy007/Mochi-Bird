@@ -14,7 +14,8 @@ const lbListEl    = document.getElementById('lbList');
 const refreshBtn  = document.getElementById('refreshBtn');
 const canCountEl  = document.getElementById('canCount');
 const shopBtnEl   = document.getElementById('shopBtn');
-const storeModalEl  = document.getElementById('storeModal');
+const muteBtnEl   = document.getElementById('muteBtn');
+const storeModalEl    = document.getElementById('storeModal');
 const storeCloseBtnEl = document.getElementById('storeCloseBtn');
 const storeBalanceEl  = document.getElementById('storeBalance');
 const skinGridEl      = document.getElementById('skinGrid');
@@ -22,13 +23,18 @@ const skinGridEl      = document.getElementById('skinGrid');
 // ── Constants ──────────────────────────────────────────────────────────────────
 const GRAVITY       = 950;
 const FLAP_VEL      = -315;
-const FLAP_COOLDOWN = 150; // ms — prevents double-tap launches
-const PIPE_SPEED    = 170;
+const FLAP_COOLDOWN = 150;
+const PIPE_SPEED    = 170;   // base — increases with score
 const PIPE_W        = 72;
-const PIPE_GAP      = 166;
+const PIPE_GAP      = 166;   // base — shrinks with score
 const PIPE_INTERVAL = 1.35;
 const GROUND_H      = 90;
 const CAN_R         = 9;
+const HIT_R         = 10;    // collision radius (smaller than visual for fair play)
+
+// Difficulty helpers
+function curPipeSpeed() { return PIPE_SPEED + Math.min(score * 2.5, 110); }
+function curPipeGap()   { return Math.max(118, PIPE_GAP - score * 1.8); }
 
 // ── Skins ──────────────────────────────────────────────────────────────────────
 function makeSkin(id, name, price, src) {
@@ -120,9 +126,79 @@ let clouds = [];
 let stars = [];
 let bgOffset = 0, spawnTimer = 0, elapsedMs = 0, score = 0, bestScore = 0;
 let buildings = [];
-let startupProgress = 0;    // 0→1 loading bar
-let startupReady    = false; // session finished loading
-let pendingReady    = false; // waiting for bar to finish before showing ready
+let startupProgress = 0;
+let startupReady    = false;
+let pendingReady    = false;
+
+// ── Audio ──────────────────────────────────────────────────────────────────────
+let audioCtx = null;
+let muted    = localStorage.getItem('mochi-bird-muted') === 'true';
+
+function getAC() {
+  if (!audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audioCtx = new AC();
+  }
+  if (audioCtx?.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+function tone({ freq = 440, end, type = 'sine', vol = 0.15, dur = 0.12, delay = 0 } = {}) {
+  if (muted) return;
+  const ac = getAC(); if (!ac) return;
+  const osc = ac.createOscillator(), gain = ac.createGain();
+  osc.connect(gain); gain.connect(ac.destination);
+  osc.type = type;
+  const t = ac.currentTime + delay;
+  osc.frequency.setValueAtTime(freq, t);
+  if (end) osc.frequency.exponentialRampToValueAtTime(end, t + dur);
+  gain.gain.setValueAtTime(vol, t);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  osc.start(t); osc.stop(t + dur + 0.01);
+}
+const sfx = {
+  flap()    { tone({ freq: 520, end: 360, vol: 0.11, dur: 0.08 }); },
+  score()   { tone({ freq: 880, vol: 0.14, dur: 0.07 }); tone({ freq: 1100, vol: 0.11, dur: 0.08, delay: 0.06 }); },
+  collect() { tone({ freq: 1400, end: 1800, vol: 0.09, dur: 0.07 }); },
+  death()   { tone({ freq: 340, end: 110, type: 'sawtooth', vol: 0.22, dur: 0.38 });
+               tone({ freq: 260, end: 80,  type: 'square',  vol: 0.10, dur: 0.42, delay: 0.06 }); },
+};
+function toggleMute() {
+  muted = !muted;
+  localStorage.setItem('mochi-bird-muted', String(muted));
+  muteBtnEl.textContent = muted ? '🔇' : '🔊';
+}
+muteBtnEl.textContent = muted ? '🔇' : '🔊';
+muteBtnEl.addEventListener('click', toggleMute);
+
+// ── Toast ──────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  requestAnimationFrame(() => { el.classList.add('show'); });
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 400);
+  }, 2800);
+}
+
+// ── Flap animation ─────────────────────────────────────────────────────────────
+let animFrame    = 0;
+let animSkinList = []; // owned frames in equipped skin's group
+
+function refreshAnimSkins() {
+  const group = SKIN_GROUPS.find(g => g.skins.some(s => s.id === equippedSkinId));
+  if (group && group.skins.length > 1) {
+    animSkinList = group.skins.filter(s => ownedSkins.has(s.id));
+  } else {
+    animSkinList = [];
+  }
+  animFrame = 0;
+}
+
+// ── Preview (try-on) ───────────────────────────────────────────────────────────
+let previewSkinId = null; // temporarily shown skin; reverts if unowned at game start
 let cans = [], sessionCans = 0, lifetimeCans = 0;
 let lastFlapTime = -Infinity;
 
@@ -305,23 +381,35 @@ function resetGame() {
   lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
   canCountEl.textContent = String(lifetimeCans);
 
+  // Revert try-on preview if skin is unowned
+  if (previewSkinId && !ownedSkins.has(previewSkinId)) {
+    previewSkinId  = null;
+    currentSkin    = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
+    refreshAnimSkins();
+  }
+
+  animFrame = 0;
+
   scoreEl.textContent = '0';
   bestScore = Number(localStorage.getItem(bestScoreKey) || 0);
   bestScoreEl.textContent = String(bestScore);
 }
 
 function addPipe() {
-  const topH = 60 + Math.random() * (H - GROUND_H - PIPE_GAP - 140);
-  pipes.push({ x: W + 30, topH, passed: false });
-  spawnCans(topH);
+  const gap  = curPipeGap();
+  const topH = 60 + Math.random() * (H - GROUND_H - gap - 140);
+  pipes.push({ x: W + 30, topH, gap, passed: false });
+  spawnCans(topH, gap);
 }
 
-function spawnCans(topH) {
-  const gapCenter = topH + PIPE_GAP / 2;
-  const spread    = PIPE_GAP * 0.28;
-  const count     = 2 + (Math.random() < 0.4 ? 1 : 0);
-  const spacing   = 38;
-  const startX    = W + 30 + PIPE_W + 30; // just past the pipe mouth
+function spawnCans(topH, gap) {
+  const gapCenter = topH + gap / 2;
+  const spread    = gap * 0.28;
+  // More cans at higher scores — reward skilled play
+  const bonusCount = Math.floor(score / 8);
+  const count      = 2 + bonusCount + (Math.random() < 0.38 ? 1 : 0);
+  const spacing    = 36;
+  const startX     = W + 30 + PIPE_W + 28;
   for (let i = 0; i < count; i++) {
     cans.push({
       x: startX + i * spacing,
@@ -336,7 +424,7 @@ function rectsOverlap(a, b) {
 }
 
 function birdBox() {
-  return { x: bird.x - bird.r, y: bird.y - bird.r, w: bird.r * 2, h: bird.r * 2 };
+  return { x: bird.x - HIT_R, y: bird.y - HIT_R, w: HIT_R * 2, h: HIT_R * 2 };
 }
 
 async function submitScore() {
@@ -387,16 +475,18 @@ function update(dt) {
 
   bird.vy += GRAVITY * dt;
   bird.y += bird.vy * dt;
-  bgOffset = (bgOffset + PIPE_SPEED * dt) % W;
+  const speed = curPipeSpeed();
+  bgOffset = (bgOffset + speed * dt) % W;
 
   // Ceiling
-  if (bird.y - bird.r <= 0) {
-    bird.y = bird.r;
+  if (bird.y - HIT_R <= 0) {
+    bird.y = HIT_R;
     bird.vy = Math.max(0, bird.vy);
   }
 
   // Ground
-  if (bird.y + bird.r >= H - GROUND_H) {
+  if (bird.y + HIT_R >= H - GROUND_H) {
+    sfx.death();
     setGameState('dead');
     submitScore();
     if (score > bestScore) {
@@ -413,12 +503,13 @@ function update(dt) {
 
   const bb = birdBox();
   for (const p of pipes) {
-    p.x -= PIPE_SPEED * dt;
+    p.x -= speed * dt;
 
-    const top = { x: p.x, y: 0, w: PIPE_W, h: p.topH };
-    const bottom = { x: p.x, y: p.topH + PIPE_GAP, w: PIPE_W, h: H - GROUND_H - (p.topH + PIPE_GAP) };
+    const top    = { x: p.x, y: 0,           w: PIPE_W, h: p.topH };
+    const bottom = { x: p.x, y: p.topH + p.gap, w: PIPE_W, h: H - GROUND_H - (p.topH + p.gap) };
 
     if (rectsOverlap(bb, top) || rectsOverlap(bb, bottom)) {
+      sfx.death();
       setGameState('dead');
       submitScore();
       if (score > bestScore) {
@@ -429,10 +520,11 @@ function update(dt) {
       return;
     }
 
-    if (!p.passed && p.x + PIPE_W < bird.x - bird.r) {
+    if (!p.passed && p.x + PIPE_W < bird.x - HIT_R) {
       p.passed = true;
       score++;
       scoreEl.textContent = String(score);
+      sfx.score();
       if (score > bestScore) {
         bestScore = score;
         bestScoreEl.textContent = String(bestScore);
@@ -456,6 +548,7 @@ function update(dt) {
       lifetimeCans++;
       localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
       canCountEl.textContent = String(lifetimeCans);
+      sfx.collect();
     }
   }
   cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
@@ -507,9 +600,22 @@ function makeSkinCard(skin) {
   btn.disabled = btnDisabled;
   btn.addEventListener('click', () => handleSkinAction(skin.id));
 
-  card.appendChild(previewImg);
-  card.appendChild(nameEl);
-  card.appendChild(btn);
+  // Try button for unowned skins
+  if (!owned && skin.price > 0) {
+    const tryBtn = document.createElement('button');
+    tryBtn.type      = 'button';
+    tryBtn.className = 'skin-action skin-try';
+    tryBtn.textContent = 'Try';
+    tryBtn.addEventListener('click', () => handleSkinAction(skin.id, 'try'));
+    card.appendChild(previewImg);
+    card.appendChild(nameEl);
+    card.appendChild(btn);
+    card.appendChild(tryBtn);
+  } else {
+    card.appendChild(previewImg);
+    card.appendChild(nameEl);
+    card.appendChild(btn);
+  }
   return card;
 }
 
@@ -530,9 +636,18 @@ function renderStore() {
   }
 }
 
-function handleSkinAction(skinId) {
+function handleSkinAction(skinId, action = 'buy-or-equip') {
   const skin = SKINS.find(s => s.id === skinId);
   if (!skin) return;
+
+  if (action === 'try') {
+    previewSkinId = skinId;
+    currentSkin   = skin;
+    refreshAnimSkins();
+    closeStore();
+    showToast('Previewing — buy to keep it!');
+    return;
+  }
 
   if (!ownedSkins.has(skinId)) {
     if (lifetimeCans < skin.price) return;
@@ -541,12 +656,46 @@ function handleSkinAction(skinId) {
     canCountEl.textContent = String(lifetimeCans);
     ownedSkins.add(skinId);
     localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
+    showToast(`✨ ${skin.name} unlocked!`);
   }
 
+  previewSkinId  = null;
   equippedSkinId = skinId;
-  currentSkin = skin;
+  currentSkin    = skin;
   localStorage.setItem('mochi-bird-skin', skinId);
+  refreshAnimSkins();
+  saveServerSkins();
   renderStore();
+}
+
+async function saveServerSkins() {
+  if (!sessionId || isPractice) return;
+  try {
+    await fetch(`/api/session/${sessionId}/skins`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ ownedSkins: [...ownedSkins], equippedSkin: equippedSkinId }),
+    });
+  } catch (err) { console.warn('[skins] save failed:', err.message); }
+}
+
+async function loadServerSkins() {
+  if (!sessionId || isPractice) return;
+  try {
+    const res  = await fetch(`/api/session/${sessionId}/skins`);
+    const data = await res.json();
+    if (!res.ok) return;
+    // Union server + local owned
+    (data.ownedSkins || []).forEach(id => ownedSkins.add(id));
+    localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
+    // Use server's equipped skin if we own it
+    if (data.equippedSkin && ownedSkins.has(data.equippedSkin)) {
+      equippedSkinId = data.equippedSkin;
+      currentSkin    = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
+      localStorage.setItem('mochi-bird-skin', equippedSkinId);
+    }
+    refreshAnimSkins();
+  } catch (err) { console.warn('[skins] load failed:', err.message); }
 }
 
 shopBtnEl.addEventListener('click', openStore);
@@ -559,6 +708,12 @@ function flap() {
   if (now - lastFlapTime < FLAP_COOLDOWN) return;
   lastFlapTime = now;
   bird.vy = FLAP_VEL;
+  sfx.flap();
+  if (navigator.vibrate) navigator.vibrate(12);
+  // Cycle animation frame through owned poses in this skin's group
+  if (animSkinList.length > 1) {
+    animFrame = (animFrame + 1) % animSkinList.length;
+  }
 }
 
 window.addEventListener('keydown', (e) => {
@@ -797,7 +952,8 @@ function drawBird() {
   ctx.translate(bird.x, bird.y);
   ctx.rotate(tilt);
 
-  const img = currentSkin.img;
+  const displaySkin = (animSkinList.length > 1) ? animSkinList[animFrame] : currentSkin;
+  const img = displaySkin?.img || currentSkin.img;
   if (img && img.complete && img.naturalWidth > 0) {
     const displayH = bird.r * 5;
     const displayW = displayH * (img.naturalWidth / img.naturalHeight);
@@ -1008,10 +1164,21 @@ function loop(ts) {
 
 // ── No Discord SDK needed - bot passes sessionId via URL parameter ──────────
 
+function checkDailyBonus() {
+  const today = new Date().toDateString();
+  const last  = localStorage.getItem('mochi-bird-daily-bonus');
+  if (last === today) return;
+  localStorage.setItem('mochi-bird-daily-bonus', today);
+  const bonus = 10;
+  lifetimeCans += bonus;
+  localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+  canCountEl.textContent = String(lifetimeCans);
+  setTimeout(() => showToast(`🥫 Daily bonus: +${bonus} cans!`), 600);
+}
+
 function signalReady() {
   startupReady  = true;
   pendingReady  = true;
-  // setGameState('ready') fires from update() once bar reaches 1
 }
 
 async function loadSession() {
@@ -1098,8 +1265,14 @@ async function loadSession() {
         localStorage.setItem(bestScoreKey, String(bestScore));
         bestScoreEl.textContent = String(bestScore);
       }
+      if (pbRes.ok && pbData.rank) {
+        statusEl.textContent = `✅ ${sessionData.userTag} · Rank #${pbData.rank}`;
+      }
     } catch {}
 
+    await loadServerSkins();
+    checkDailyBonus();
+    refreshAnimSkins();
     console.log('[boot] Session ready');
     signalReady(); fetchLeaderboard();
   } catch (err) {
@@ -1113,6 +1286,8 @@ async function loadSession() {
 try {
   console.log('[boot] Initializing game...');
   applyLayout();
+  refreshAnimSkins();
+  checkDailyBonus();
   console.log('[boot] Layout applied');
 
   resize();

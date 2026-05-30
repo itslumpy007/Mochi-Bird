@@ -2,7 +2,7 @@ import express from 'express';
 import path    from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { completeSession, createSession, getSession, publicSession, getSessionByToken, getLatestSessionForUser, getPendingActivitySession } from './state.js';
-import { getLeaderboard, getPersonalBest, recordScore }              from './leaderboard.js';
+import { getLeaderboard, getPersonalBest, recordScore, getPlayerRank, getPlayerSkins, savePlayerSkins } from './leaderboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, '..', 'public');
@@ -128,11 +128,31 @@ export function createServer({ onScoreSubmitted } = {}) {
     res.json({ ok: true, leaderboard });
   });
 
-  // Personal best
+  // Personal best + rank
   app.get('/api/leaderboard/:userId', async (req, res) => {
-    const entry = await getPersonalBest(req.params.userId);
+    const [entry, rank] = await Promise.all([
+      getPersonalBest(req.params.userId),
+      getPlayerRank(req.params.userId),
+    ]);
     if (!entry) return res.status(404).json({ ok: false, error: 'No score yet' });
-    res.json({ ok: true, entry });
+    res.json({ ok: true, entry, rank });
+  });
+
+  // Player skins — GET
+  app.get('/api/session/:id/skins', async (req, res) => {
+    const s = getSession(req.params.id);
+    if (!s) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const skins = await getPlayerSkins(s.userId);
+    res.json({ ok: true, ...skins });
+  });
+
+  // Player skins — POST
+  app.post('/api/session/:id/skins', async (req, res) => {
+    const s = getSession(req.params.id);
+    if (!s) return res.status(404).json({ ok: false, error: 'Session not found' });
+    const { ownedSkins, equippedSkin } = req.body;
+    await savePlayerSkins({ userId: s.userId, ownedSkins, equippedSkin });
+    res.json({ ok: true });
   });
 
   return app;

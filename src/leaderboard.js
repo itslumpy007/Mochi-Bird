@@ -70,3 +70,31 @@ export async function getPersonalBest(userId) {
   const board = await load();
   return board.get(userId) ?? null;
 }
+
+export async function getPlayerRank(userId) {
+  const board  = await load();
+  const sorted = [...board.values()].sort((a, b) => b.bestScore - a.bestScore);
+  const idx    = sorted.findIndex(e => e.userId === userId);
+  return idx >= 0 ? idx + 1 : null;
+}
+
+export async function getPlayerSkins(userId) {
+  const board = await load();
+  const entry = board.get(userId);
+  return {
+    ownedSkins:   entry?.ownedSkins   || ['default'],
+    equippedSkin: entry?.equippedSkin || 'default',
+  };
+}
+
+export async function savePlayerSkins({ userId, ownedSkins, equippedSkin }) {
+  await writeQueue;
+  cache = null;
+  const board = await load();
+  const entry = board.get(userId);
+  if (!entry) return; // no score yet — nothing to attach to
+  entry.ownedSkins   = Array.isArray(ownedSkins) ? ownedSkins : (entry.ownedSkins || ['default']);
+  entry.equippedSkin = equippedSkin || entry.equippedSkin || 'default';
+  board.set(userId, entry);
+  enqueuePersist();
+}
