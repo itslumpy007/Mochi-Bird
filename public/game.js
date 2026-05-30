@@ -328,8 +328,10 @@ stageEl.addEventListener('pointerdown', (e) => {
 });
 
 stageEl.addEventListener('touchstart', (e) => {
-  e.preventDefault();
-  if (gameState === 'playing') bird.vy = FLAP_VEL;
+  if (gameState === 'playing') {
+    e.preventDefault();
+    bird.vy = FLAP_VEL;
+  }
 }, { passive: false });
 
 refreshBtn.addEventListener('click', () => fetchLeaderboard());
