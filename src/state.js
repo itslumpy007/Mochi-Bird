@@ -87,12 +87,21 @@ export function getLatestSessionForUser(userId) {
 }
 
 export function getPendingActivitySession() {
-  if (!lastCreatedSession) return null;
-  // Check if the auto-link window has expired (30 seconds)
-  if (now() > lastCreatedSession.expiresAt) {
+  const currentTime = now();
+  console.log(`[state] getPendingActivitySession called. lastCreatedSession:`, lastCreatedSession ? `exists, expires at ${new Date(lastCreatedSession.expiresAt).toISOString()}, now is ${new Date(currentTime).toISOString()}` : 'null');
+
+  if (!lastCreatedSession) {
+    console.log('[state] lastCreatedSession is null');
+    return null;
+  }
+
+  if (currentTime > lastCreatedSession.expiresAt) {
+    console.log('[state] Session expired');
     lastCreatedSession = null;
     return null;
   }
+
+  console.log('[state] Returning pending session');
   return lastCreatedSession.session;
 }
 
