@@ -505,12 +505,6 @@ async function tryInitDiscordActivity() {
   try {
     console.log('[activity] Attempting Discord Activity initialization...');
 
-    // Check if we're in a Discord iframe (iframe detection)
-    if (window.self === window.top) {
-      console.log('[activity] Not in iframe, skipping Discord Activity');
-      return false;
-    }
-
     // Load Discord SDK with timeout
     console.log('[activity] Loading Discord SDK...');
     const sdkModule = await Promise.race([
