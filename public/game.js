@@ -67,6 +67,10 @@ function makeSkin(id, name, price, src) {
 // Sprite-sheet skin (shares one loaded image, uses sx/sy crop)
 const bobaSheet = new Image();
 bobaSheet.src = '/assets/cosmetics/image-1780163497426.webp';
+bobaSheet.addEventListener('load', () => {
+  // Re-render store if it's already open so boba previews fill in
+  if (storeModalEl && !storeModalEl.classList.contains('hidden')) renderStore();
+});
 
 function makeSheetSkin(id, name, price, col, row) {
   return { id, name, price, src: null, img: null, sheet: bobaSheet, col, row, sheetCols: 4, sheetRows: 2 };
@@ -1227,32 +1231,52 @@ function makeSkinCard(skin) {
   const card = document.createElement('div');
   card.className = 'skin-card' + (equipped ? ' equipped' : '');
 
-  let previewImg;
-  if (skin.sheet) {
-    // Sheet skin — draw the correct cell onto a canvas preview
-    previewImg = document.createElement('canvas');
-    previewImg.width  = 80;
-    previewImg.height = 100;
-    previewImg.className = 'skin-preview';
-    const drawCell = () => {
-      if (!skin.sheet.complete || !skin.sheet.naturalWidth) { skin.sheet.addEventListener('load', drawCell, { once: true }); return; }
-      const c  = previewImg.getContext('2d');
-      const sw = skin.sheet.naturalWidth  / skin.sheetCols;
-      const sh = skin.sheet.naturalHeight / skin.sheetRows;
+  // All previews use canvas so we can circle-clip any background colour
+  const previewImg = document.createElement('canvas');
+  previewImg.width  = 80;
+  previewImg.height = 100;
+  previewImg.className = 'skin-preview';
+
+  function renderPreview() {
+    const c = previewImg.getContext('2d');
+    c.clearRect(0, 0, 80, 100);
+
+    if (skin.sheet) {
+      // Sprite-sheet skin (boba tea etc.)
+      const sheet = skin.sheet;
+      if (!sheet.complete || !sheet.naturalWidth) {
+        sheet.addEventListener('load', renderPreview, { once: true });
+        return;
+      }
+      const sw = sheet.naturalWidth  / skin.sheetCols;
+      const sh = sheet.naturalHeight / skin.sheetRows;
       const sx = skin.col * sw, sy = skin.row * sh;
       const scale = Math.min(80 / sw, 100 / sh);
       const dw = sw * scale, dh = sh * scale;
-      c.clearRect(0, 0, 80, 100);
-      c.drawImage(skin.sheet, sx, sy, sw, sh, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
-    };
-    drawCell();
-  } else {
-    previewImg = document.createElement('img');
-    previewImg.src     = skin.src;
-    previewImg.alt     = skin.name;
-    previewImg.loading = 'lazy';
+      c.drawImage(sheet, sx, sy, sw, sh, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
+    } else if (skin.img) {
+      // Regular sprite — circle-clip to hide any solid background
+      const img = skin.img;
+      if (!img.complete || !img.naturalWidth) {
+        img.addEventListener('load', renderPreview, { once: true });
+        return;
+      }
+      const aspect = img.naturalWidth / img.naturalHeight;
+      let dw = 80, dh = 80 / aspect;
+      if (dh > 100) { dh = 100; dw = 100 * aspect; }
+      c.save();
+      c.beginPath();
+      c.arc(40, 50, 36, 0, Math.PI * 2);
+      c.clip();
+      c.drawImage(img, (80 - dw) / 2, (100 - dh) / 2, dw, dh);
+      c.restore();
+      // Subtle ring
+      c.strokeStyle = 'rgba(255,255,255,0.12)';
+      c.lineWidth = 1.5;
+      c.beginPath(); c.arc(40, 50, 36, 0, Math.PI * 2); c.stroke();
+    }
   }
-  previewImg.className = 'skin-preview';
+  renderPreview();
 
   const nameEl = document.createElement('div');
   nameEl.className = 'skin-name';
