@@ -13,6 +13,11 @@ const lbStatusEl  = document.getElementById('lbStatus');
 const lbListEl    = document.getElementById('lbList');
 const refreshBtn  = document.getElementById('refreshBtn');
 const canCountEl  = document.getElementById('canCount');
+const shopBtnEl   = document.getElementById('shopBtn');
+const storeModalEl  = document.getElementById('storeModal');
+const storeCloseBtnEl = document.getElementById('storeCloseBtn');
+const storeBalanceEl  = document.getElementById('storeBalance');
+const skinGridEl      = document.getElementById('skinGrid');
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 const GRAVITY       = 950;
@@ -24,6 +29,20 @@ const PIPE_GAP      = 166;
 const PIPE_INTERVAL = 1.35;
 const GROUND_H      = 90;
 const CAN_R         = 9;
+
+// ── Skins ──────────────────────────────────────────────────────────────────────
+const SKINS = [
+  { id: 'default', name: 'Classic', price: 0,   body: '#ffd84d', wing: '#ffb31f', beak: '#f27d2f', eye: '#1a2230' },
+  { id: 'ocean',   name: 'Ocean',   price: 60,  body: '#4dc8ff', wing: '#1fa8f5', beak: '#ff8c42', eye: '#0d1a2e' },
+  { id: 'cherry',  name: 'Cherry',  price: 120, body: '#ff4d6d', wing: '#e0193a', beak: '#ffd84d', eye: '#1a0d12' },
+  { id: 'neon',    name: 'Neon',    price: 200, body: '#39ff8a', wing: '#20e070', beak: '#ff39d4', eye: '#001a0d' },
+  { id: 'void',    name: 'Void',    price: 350, body: '#8b6fff', wing: '#6b4fff', beak: '#ff9f4d', eye: '#0d0a1a' },
+  { id: 'solar',   name: 'Solar',   price: 500, body: '#ff8c42', wing: '#e06020', beak: '#ffd84d', eye: '#1a0d00' },
+];
+
+let ownedSkins    = new Set(JSON.parse(localStorage.getItem('mochi-bird-owned') || '["default"]'));
+let equippedSkinId = localStorage.getItem('mochi-bird-skin') || 'default';
+let currentSkin   = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
 
 // ── Canvas ─────────────────────────────────────────────────────────────────────
 let W = 360, H = 640, DPR = 1;
@@ -96,12 +115,14 @@ function updateUI() {
         statusEl.textContent = `✅ Session: ${sessionData?.userTag || 'guest'}`;
       }
       startBtn.disabled = false;
+      shopBtnEl.disabled = false;
       break;
 
     case 'playing':
       hideOverlay();
       statusEl.textContent = isPractice ? 'Playing' : 'Session running';
       startBtn.disabled = true;
+      shopBtnEl.disabled = true;
       break;
 
     case 'dead':
@@ -109,6 +130,7 @@ function updateUI() {
       showOverlay('Game Over', `You scored ${score} ${plural}`, 'Play Again');
       statusEl.textContent = `Game over — scored ${score}`;
       startBtn.disabled = false;
+      shopBtnEl.disabled = false;
       break;
 
     case 'error':
@@ -361,6 +383,124 @@ function update(dt) {
   cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
 }
 
+// ── Store ──────────────────────────────────────────────────────────────────────
+function openStore() {
+  renderStore();
+  storeModalEl.classList.remove('hidden');
+}
+function closeStore() {
+  storeModalEl.classList.add('hidden');
+}
+
+function drawSkinPreview(canvas, skin) {
+  const c = canvas.getContext('2d');
+  const r = canvas.width / 2;
+  c.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Body
+  c.fillStyle = skin.body;
+  c.beginPath();
+  c.arc(r, r, r - 2, 0, Math.PI * 2);
+  c.fill();
+
+  // Wing
+  c.fillStyle = skin.wing;
+  c.beginPath();
+  c.ellipse(r - 4, r + 6, 13, 9, -0.3, 0, Math.PI * 2);
+  c.fill();
+
+  // Eye
+  c.fillStyle = skin.eye;
+  c.beginPath();
+  c.arc(r + 8, r - 6, 3.5, 0, Math.PI * 2);
+  c.fill();
+  c.fillStyle = '#fff';
+  c.beginPath();
+  c.arc(r + 9, r - 7, 1.2, 0, Math.PI * 2);
+  c.fill();
+
+  // Beak
+  c.fillStyle = skin.beak;
+  c.beginPath();
+  c.moveTo(r + 16, r - 2);
+  c.lineTo(r + 28, r + 4);
+  c.lineTo(r + 16, r + 10);
+  c.closePath();
+  c.fill();
+}
+
+function renderStore() {
+  storeBalanceEl.textContent = lifetimeCans;
+  skinGridEl.innerHTML = '';
+
+  for (const skin of SKINS) {
+    const owned    = ownedSkins.has(skin.id);
+    const equipped = skin.id === equippedSkinId;
+    const canAfford = lifetimeCans >= skin.price;
+
+    const card = document.createElement('div');
+    card.className = 'skin-card' + (equipped ? ' equipped' : '');
+
+    const previewCanvas = document.createElement('canvas');
+    previewCanvas.width  = 72;
+    previewCanvas.height = 72;
+    previewCanvas.className = 'skin-preview';
+
+    let btnClass = 'skin-action';
+    let btnText, btnDisabled;
+    if (equipped) {
+      btnClass += ' active'; btnText = 'Equipped'; btnDisabled = true;
+    } else if (owned) {
+      btnClass += ' owned'; btnText = 'Equip'; btnDisabled = false;
+    } else if (canAfford) {
+      btnText = `Buy · ${skin.price} 🥫`; btnDisabled = false;
+    } else {
+      btnText = `${skin.price} 🥫`; btnDisabled = true;
+    }
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = btnClass;
+    btn.textContent = btnText;
+    btn.disabled = btnDisabled;
+    btn.addEventListener('click', () => handleSkinAction(skin.id));
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'skin-name';
+    nameEl.textContent = skin.name;
+
+    card.appendChild(previewCanvas);
+    card.appendChild(nameEl);
+    card.appendChild(btn);
+    skinGridEl.appendChild(card);
+
+    drawSkinPreview(previewCanvas, skin);
+  }
+}
+
+function handleSkinAction(skinId) {
+  const skin = SKINS.find(s => s.id === skinId);
+  if (!skin) return;
+
+  if (!ownedSkins.has(skinId)) {
+    if (lifetimeCans < skin.price) return;
+    lifetimeCans -= skin.price;
+    localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+    canCountEl.textContent = String(lifetimeCans);
+    ownedSkins.add(skinId);
+    localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
+  }
+
+  equippedSkinId = skinId;
+  currentSkin = skin;
+  localStorage.setItem('mochi-bird-skin', skinId);
+  renderStore();
+}
+
+shopBtnEl.addEventListener('click', openStore);
+storeCloseBtnEl.addEventListener('click', closeStore);
+storeModalEl.addEventListener('pointerdown', (e) => { if (e.target === storeModalEl) closeStore(); });
+
 // ── Input ──────────────────────────────────────────────────────────────────────
 function flap() {
   const now = performance.now();
@@ -481,25 +621,25 @@ function drawBird() {
   ctx.rotate(tilt);
 
   // Base circle
-  ctx.fillStyle = '#ffd84d';
+  ctx.fillStyle = currentSkin.body;
   ctx.beginPath();
   ctx.arc(0, 0, bird.r, 0, Math.PI * 2);
   ctx.fill();
 
   // Wing
-  ctx.fillStyle = '#ffb31f';
+  ctx.fillStyle = currentSkin.wing;
   ctx.beginPath();
   ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
   ctx.fill();
 
   // Eye
-  ctx.fillStyle = '#1a2230';
+  ctx.fillStyle = currentSkin.eye;
   ctx.beginPath();
   ctx.arc(5, -4, 2.1, 0, Math.PI * 2);
   ctx.fill();
 
   // Beak
-  ctx.fillStyle = '#f27d2f';
+  ctx.fillStyle = currentSkin.beak;
   ctx.beginPath();
   ctx.moveTo(11, -1);
   ctx.lineTo(20, 3);

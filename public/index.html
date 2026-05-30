@@ -34,6 +34,7 @@
               <strong id="canCount">0</strong>
             </div>
             <span class="status" id="status">Loading…</span>
+            <button id="shopBtn" class="ghost shop-btn" type="button">Shop</button>
           </div>
 
           <div class="stage" id="stage">
@@ -64,6 +65,18 @@
         </aside>
       </div>
     </main>
+
+    <!-- Store modal -->
+    <div class="store-modal hidden" id="storeModal">
+      <div class="store-panel">
+        <div class="store-header">
+          <h2>Bird Shop</h2>
+          <button id="storeCloseBtn" class="ghost" type="button">✕</button>
+        </div>
+        <p class="store-balance">Balance: <strong id="storeBalance">0</strong> cans</p>
+        <div class="skin-grid" id="skinGrid"></div>
+      </div>
+    </div>
 
     <script type="module" src="/game-v2.js"></script>
   </body>
