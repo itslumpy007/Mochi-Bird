@@ -195,6 +195,29 @@ let menuBtns = []; // populated each frame during 'menu' state
 let shakeAmt = 0;
 function triggerShake(amt) { shakeAmt = amt; }
 
+// ── Lava geysers (Hell Mode) ───────────────────────────────────────────────────
+let lavaGeyserTimer     = 0;
+let lavaGeyserParticles = [];
+
+function spawnLavaGeyser() {
+  const x      = W * (0.05 + Math.random() * 0.9);
+  const groundY = H - GROUND_H;
+  const count  = 12 + Math.floor(Math.random() * 10);
+  for (let i = 0; i < count; i++) {
+    const spd   = 160 + Math.random() * 220;
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.65;
+    lavaGeyserParticles.push({
+      x, y: groundY,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd,
+      life:    0.5 + Math.random() * 0.5,
+      maxLife: 1.0,
+      color: ['#ff6600','#ff3300','#ff9900','#ffcc00','#cc2200'][Math.floor(Math.random() * 5)],
+      size:  4 + Math.random() * 7,
+    });
+  }
+}
+
 // ── Death animation ───────────────────────────────────────────────────────────
 let dyingTimer = 0;
 let dyingVy    = 0;
@@ -781,6 +804,8 @@ function resetGame() {
   }));
 
   cans = [];
+  lavaGeyserParticles = [];
+  lavaGeyserTimer = 0.5;
   sessionCans = 0;
   lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
   canCountEl.textContent = String(lifetimeCans);
@@ -1131,6 +1156,22 @@ function update(dt) {
     }
   }
   cans = cans.filter(c => !c.collected && c.x > -CAN_R * 2);
+
+  // ── Lava geysers ─────────────────────────────────────────────────────────────
+  if (hellMode) {
+    lavaGeyserTimer -= dt;
+    if (lavaGeyserTimer <= 0) {
+      spawnLavaGeyser();
+      lavaGeyserTimer = 1.2 + Math.random() * 1.8; // every 1.2–3s
+    }
+    for (const p of lavaGeyserParticles) {
+      p.x  += p.vx * dt;
+      p.y  += p.vy * dt;
+      p.vy += 420 * dt; // gravity pulls lava back down
+      p.life -= dt;
+    }
+    lavaGeyserParticles = lavaGeyserParticles.filter(p => p.life > 0);
+  }
 
   // Power-ups
   for (const p of powerups) {
@@ -1997,6 +2038,26 @@ function drawCans() {
   }
 }
 
+function drawLavaGeysers() {
+  if (!hellMode || lavaGeyserParticles.length === 0) return;
+  for (const p of lavaGeyserParticles) {
+    const alpha = Math.max(0, p.life / p.maxLife);
+    // Larger, glowing lava blobs
+    ctx.globalAlpha = alpha * 0.9;
+    ctx.fillStyle   = p.color;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+    ctx.fill();
+    // Inner bright core
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.fillStyle   = '#ffee88';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
 function drawParticles() {
   for (const p of particles) {
     const alpha = Math.max(0, p.life / p.maxLife);
@@ -2767,6 +2828,7 @@ function loop(ts) {
     drawClouds();
     drawPipes();
     drawGround();
+    drawLavaGeysers();
     drawPowerups();
     drawParticles();
     drawCans();
