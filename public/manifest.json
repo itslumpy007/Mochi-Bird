@@ -1,0 +1,12 @@
+{
+  "name": "Mochi Bird",
+  "short_name": "Mochi Bird",
+  "description": "Kawaii flappy bird game with Discord integration",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#071018",
+  "theme_color": "#ff6eb4",
+  "icons": [
+    { "src": "/assets/mochi-logo.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

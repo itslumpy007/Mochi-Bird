@@ -87,6 +87,16 @@ export async function getPlayerSkins(userId) {
   };
 }
 
+export async function getTodayLeaderboard(limit = 10) {
+  const board = await load();
+  const todayStart = new Date();
+  todayStart.setHours(0,0,0,0);
+  return [...board.values()]
+    .filter(e => e.updatedAt && new Date(e.updatedAt) >= todayStart)
+    .sort((a, b) => b.lastScore - a.lastScore || a.userTag.localeCompare(b.userTag))
+    .slice(0, limit);
+}
+
 export async function savePlayerSkins({ userId, ownedSkins, equippedSkin }) {
   await writeQueue;
   cache = null;

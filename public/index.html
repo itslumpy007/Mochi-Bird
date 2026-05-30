@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Mochi Bird</title>
     <link rel="stylesheet" href="/style.css" />
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#ff6eb4">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   </head>
   <body>
     <div class="bg-orb orb-a"></div>
@@ -34,9 +38,13 @@
               <strong id="canCount">0</strong>
             </div>
             <span class="status" id="status">Loading…</span>
-            <button id="muteBtn"       class="ghost hud-icon-btn" type="button" title="Toggle sound">🔊</button>
-            <button id="challengesBtn" class="ghost hud-icon-btn" type="button" title="Daily Challenges">🎯</button>
-            <button id="shopBtn"       class="ghost shop-btn"     type="button">Shop</button>
+            <div class="hud-actions">
+              <button id="muteBtn"       class="ghost hud-icon-btn" type="button" title="Toggle sound">🔊</button>
+              <button id="challengesBtn" class="ghost hud-icon-btn" type="button" title="Daily Challenges">🎯</button>
+              <button id="statsBtn"      class="ghost hud-icon-btn" type="button" title="Stats">📊</button>
+              <button id="settingsBtn"   class="ghost hud-icon-btn" type="button" title="Settings">⚙️</button>
+              <button id="shopBtn"       class="ghost shop-btn"     type="button">Shop</button>
+            </div>
           </div>
 
           <div class="stage" id="stage">
@@ -64,6 +72,10 @@
             </div>
             <button id="refreshBtn" class="ghost" type="button">Refresh</button>
           </div>
+          <div class="lb-tabs">
+            <button class="lb-tab active" id="lbTabAll">All Time</button>
+            <button class="lb-tab" id="lbTabToday">Today</button>
+          </div>
           <p class="lb-status" id="lbStatus">Loading…</p>
           <ol class="lb-list" id="lbList"></ol>
         </aside>
@@ -78,6 +90,17 @@
           <button id="storeCloseBtn" class="ghost" type="button">✕</button>
         </div>
         <p class="store-balance">Balance: <strong id="storeBalance">0</strong> cans</p>
+        <div class="store-filters" id="storeFilters">
+          <button class="store-filter-btn active" data-filter="all">All</button>
+          <button class="store-filter-btn" data-filter="owned">Owned</button>
+          <button class="store-filter-btn" data-filter="default">Default</button>
+          <button class="store-filter-btn" data-filter="dr-shelly">Dr. Shelly</button>
+          <button class="store-filter-btn" data-filter="shelly-zero">Shelly Zero</button>
+          <button class="store-filter-btn" data-filter="shalani">Shalani</button>
+          <button class="store-filter-btn" data-filter="sussballs">Sussballs</button>
+          <button class="store-filter-btn" data-filter="watermelon">Watermelon</button>
+          <button class="store-filter-btn" data-filter="hair">Hair</button>
+        </div>
         <div class="skin-grid" id="skinGrid"></div>
       </div>
     </div>
@@ -91,6 +114,51 @@
         </div>
         <p class="store-balance">Complete challenges to earn bonus cans!</p>
         <div id="challengesList" class="challenges-list"></div>
+      </div>
+    </div>
+
+    <!-- Settings modal -->
+    <div class="store-modal hidden" id="settingsModal">
+      <div class="store-panel">
+        <div class="store-header">
+          <h2>Settings</h2>
+          <button id="settingsCloseBtn" class="ghost" type="button">✕</button>
+        </div>
+        <div class="settings-list">
+          <div class="settings-row">
+            <span>Difficulty</span>
+            <div class="settings-options" id="difficultyBtns">
+              <button data-val="easy">Easy</button>
+              <button data-val="normal">Normal</button>
+              <button data-val="hard">Hard</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span>Sound</span>
+            <div class="settings-options" id="soundToggle">
+              <button data-val="on">On</button>
+              <button data-val="off">Off</button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <span>Particles</span>
+            <div class="settings-options" id="particlesToggle">
+              <button data-val="on">On</button>
+              <button data-val="off">Off</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats modal -->
+    <div class="store-modal hidden" id="statsModal">
+      <div class="store-panel">
+        <div class="store-header">
+          <h2>My Stats</h2>
+          <button id="statsCloseBtn" class="ghost" type="button">✕</button>
+        </div>
+        <div class="stats-grid" id="statsGrid"></div>
       </div>
     </div>
 

@@ -94,11 +94,13 @@ body.desktop .orb-b { width:300px;height:300px;background:rgba(255,200,87,.16);r
 .stat strong { font-size: 1.3rem; line-height: 1; }
 
 .status {
-  margin-left: auto;
   font-size: .82rem;
   color: var(--muted);
   text-align: right;
 }
+
+.hud-actions { display: flex; gap: 4px; margin-left: auto; align-items: center; }
+.hud-actions .ghost { padding: 5px 8px; min-height: 32px; font-size: .8rem; }
 
 /* Stage fills remaining space */
 .stage {
@@ -580,3 +582,32 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .challenge-progress { color: var(--muted); }
 .challenge-reward   { color: var(--gold); font-weight: 700; margin-left: auto; }
 .challenge-done     { color: var(--accent); font-weight: 800; }
+
+/* ── Store filters ─────────────────────────────────────────────── */
+.store-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.store-filter-btn { background: rgba(255,255,255,.06); color: var(--muted); box-shadow: none; border: 1px solid rgba(255,255,255,.08); min-width: 0; padding: 5px 10px; font-size: .75rem; min-height: 30px; border-radius: 999px; cursor: pointer; }
+.store-filter-btn.active { background: rgba(255,110,180,.2); color: #ff6eb4; border-color: rgba(255,110,180,.4); }
+
+/* ── Skin group desc ───────────────────────────────────────────── */
+.skin-group-desc { font-size: .78rem; color: var(--muted); margin: -10px 0 4px; }
+
+/* ── Settings modal ────────────────────────────────────────────── */
+.settings-list { display: flex; flex-direction: column; gap: 16px; margin-top: 8px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; font-size: .92rem; }
+.settings-options { display: flex; gap: 6px; }
+.settings-options button { min-width: 0; padding: 6px 14px; font-size: .8rem; min-height: 32px; background: rgba(255,255,255,.07); color: var(--muted); box-shadow: none; border: 1px solid rgba(255,255,255,.1); }
+.settings-options button.active-setting { background: rgba(37,208,171,.2); color: var(--accent); border-color: rgba(37,208,171,.4); }
+
+/* ── Stats modal ───────────────────────────────────────────────── */
+.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 8px; }
+.stat-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px 12px; text-align: center; }
+.stat-card .stat-value { font-size: 1.4rem; font-weight: 800; color: var(--gold); }
+.stat-card .stat-label { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+
+/* ── Leaderboard tabs ──────────────────────────────────────────── */
+.lb-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.lb-tab { min-width: 0; padding: 5px 12px; font-size: .78rem; min-height: 28px; background: rgba(255,255,255,.06); color: var(--muted); box-shadow: none; border: 1px solid rgba(255,255,255,.08); }
+.lb-tab.active { background: rgba(37,208,171,.18); color: var(--accent); border-color: rgba(37,208,171,.35); }
+
+/* ── Leaderboard rank note ─────────────────────────────────────── */
+.lb-rank-note { font-size: .78rem; color: var(--muted); text-align: center; margin-top: 8px; font-style: italic; }

@@ -2,7 +2,7 @@ import express from 'express';
 import path    from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { completeSession, createSession, getSession, publicSession, getSessionByToken, getLatestSessionForUser, getPendingActivitySession } from './state.js';
-import { getLeaderboard, getPersonalBest, recordScore, getPlayerRank, getPlayerSkins, savePlayerSkins } from './leaderboard.js';
+import { getLeaderboard, getTodayLeaderboard, getPersonalBest, recordScore, getPlayerRank, getPlayerSkins, savePlayerSkins } from './leaderboard.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const publicDir = path.join(__dirname, '..', 'public');
@@ -130,6 +130,12 @@ export function createServer({ onScoreSubmitted, onShare } = {}) {
     if (score === null) return res.status(400).json({ ok: false, error: 'Invalid score' });
     if (typeof onShare === 'function') await onShare({ session: s, score }).catch(() => {});
     res.json({ ok: true });
+  });
+
+  // Today's leaderboard (must be BEFORE /api/leaderboard/:userId to avoid conflict)
+  app.get('/api/leaderboard/today', async (_req, res) => {
+    const leaderboard = await getTodayLeaderboard(10);
+    res.json({ ok: true, leaderboard });
   });
 
   // Leaderboard
