@@ -950,12 +950,87 @@ button:disabled { opacity: .42; cursor: not-allowed; }
 .lb-rank-note { font-size: .78rem; color: var(--muted); text-align: center; margin-top: 8px; font-style: italic; }
 
 @media (max-width: 699px) {
+  .shell {
+    min-height: 100dvh;
+  }
+
+  .grid {
+    min-height: 0;
+  }
+
+  .hud {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    align-items: start;
+    padding: max(10px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 10px max(12px, env(safe-area-inset-left));
+  }
+
+  .stat {
+    min-width: 0;
+  }
+
+  .stat strong {
+    font-size: 1.15rem;
+  }
+
+  .status-stack {
+    grid-column: 1 / -1;
+    margin-left: 0;
+    text-align: left;
+    justify-items: start;
+    gap: 4px;
+  }
+
+  .status,
+  .player-title,
+  .season-badge,
+  .revive-badge {
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .hud-actions {
+    grid-column: 1 / -1;
+    margin-left: 0;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 6px;
+  }
+
+  .hud-actions .ghost {
+    margin-left: 0;
+  }
+
+  .hud-actions .hud-icon-btn {
+    flex: 1 1 46px;
+  }
+
+  .hud-actions .shop-btn {
+    flex: 1 1 84px;
+  }
+
+  .stage {
+    min-height: 0;
+  }
+
+  .overlay-card {
+    width: min(92%, 340px);
+    padding: 20px 16px;
+  }
+
   .store-panel {
     width: min(100%, 560px);
-    max-height: calc(100vh - 24px);
+    max-height: calc(100dvh - 20px);
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     padding: 18px 16px 22px;
+  }
+
+  .store-modal {
+    padding: 10px 8px calc(10px + env(safe-area-inset-bottom));
   }
 
   .store-filters {
@@ -975,5 +1050,46 @@ button:disabled { opacity: .42; cursor: not-allowed; }
   .store-filter-btn {
     flex: 0 0 auto;
     white-space: nowrap;
+  }
+
+  .settings-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .settings-options {
+    flex-wrap: wrap;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .run-row {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .run-row-age {
+    white-space: normal;
+  }
+
+  .title-chip-list,
+  .achievement-list,
+  .achievement-summary {
+    gap: 6px;
+  }
+
+  .title-picker {
+    margin-top: 4px;
+  }
+
+  .revive-confirm-actions {
+    flex-direction: column;
+  }
+
+  .revive-confirm-actions button {
+    width: 100%;
   }
 }
