@@ -645,16 +645,15 @@ function getCanMult() {
 const POWERUP_DURATION = {
   magnet: 6,
   shield: 1,
-  feather: 5,
   canrush: 8,
 };
 
 let powerups = [];
-let activePowerups = { magnet: 0, shield: false, feather: 0, canrush: 0 };
+let activePowerups = { magnet: 0, shield: false, canrush: 0 };
 let shieldFlash = 0; // timer for white flash effect
 
 function getGravityMult() {
-  return activePowerups.feather > 0 ? 0.68 : 1;
+  return 1;
 }
 
 function getCanRushMult() {
@@ -1863,7 +1862,7 @@ function resetGame() {
   dyingVy          = 0;
   if (pauseBtnEl) { pauseBtnEl.textContent = '⏸'; }
   challengeSessionCans = 0;
-  activePowerups   = { magnet: 0, shield: false, feather: 0, canrush: 0 };
+  activePowerups   = { magnet: 0, shield: false, canrush: 0 };
 
   // Per-run stats
   runCans        = 0;
@@ -1887,9 +1886,7 @@ function addPipe() {
       ? 'magnet'
       : roll < 0.55
         ? 'shield'
-        : roll < 0.75
-          ? 'feather'
-          : 'canrush';
+        : 'canrush';
     const gapCenter = topH + gap / 2;
     powerups.push({ x: W + 30 + PIPE_W / 2, y: gapCenter, type, collected: false });
   }
@@ -2055,10 +2052,6 @@ function update(dt) {
   if (activePowerups.magnet > 0) {
     activePowerups.magnet -= dt;
     if (activePowerups.magnet < 0) activePowerups.magnet = 0;
-  }
-  if (activePowerups.feather > 0) {
-    activePowerups.feather -= dt;
-    if (activePowerups.feather < 0) activePowerups.feather = 0;
   }
   if (activePowerups.canrush > 0) {
     activePowerups.canrush -= dt;
@@ -2270,9 +2263,6 @@ function update(dt) {
       } else if (p.type === 'shield') {
         activePowerups.shield = true;
         showToast('🛡️ Shield activated!');
-      } else if (p.type === 'feather') {
-        activePowerups.feather = POWERUP_DURATION.feather;
-        showToast('🪶 Feather glide! (5s)');
       } else if (p.type === 'canrush') {
         activePowerups.canrush = POWERUP_DURATION.canrush;
         showToast('🥫 Can rush! (8s)');
@@ -3374,7 +3364,6 @@ function drawPowerups() {
     let col;
     if (p.type === 'magnet')       col = '#ff6eb4';
     else if (p.type === 'shield')  col = '#4af0f0';
-    else if (p.type === 'feather') col = '#ffd166';
     else if (p.type === 'canrush') col = '#66d19e';
     else                            col = '#c47aff';
 
@@ -3401,7 +3390,6 @@ function drawPowerups() {
     ctx.textBaseline = 'middle';
     const label = p.type === 'magnet' ? '🧲'
       : p.type === 'shield' ? '🛡'
-      : p.type === 'feather' ? '🪶'
       : p.type === 'canrush' ? '🥫'
       : '❖';
     ctx.fillText(label, 0, 0);
@@ -3414,7 +3402,6 @@ function drawActivePowerupHUD() {
   const items = [];
   if (activePowerups.magnet > 0)   items.push({ label: '🧲', timer: activePowerups.magnet, max: POWERUP_DURATION.magnet, col: '#ff6eb4' });
   if (activePowerups.shield)       items.push({ label: '🛡', timer: 1, max: POWERUP_DURATION.shield, col: '#4af0f0' });
-  if (activePowerups.feather > 0)  items.push({ label: '🪶', timer: activePowerups.feather, max: POWERUP_DURATION.feather, col: '#ffd166' });
   if (activePowerups.canrush > 0)   items.push({ label: '🥫', timer: activePowerups.canrush, max: POWERUP_DURATION.canrush, col: '#66d19e' });
 
   let ox = W / 2 - (items.length * 44) / 2;
