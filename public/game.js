@@ -143,6 +143,15 @@ const ACHIEVEMENTS = [
   { id: 'can_1000', name: 'Can Hoarder', desc: 'Earn 1,000 cans lifetime.', reward: { kind: 'cans', amount: 300 }, unlockedBy: p => (p.totalCansEarned || 0) >= 1000 },
 ];
 
+let unlockedAchievements = [];
+let availableTitles = [];
+let equippedTitle = null;
+let achievementRewardClaims = [];
+let recentAchievementRewardId = null;
+let recentAchievementRewardTimer = null;
+let seasonState = null;
+let deathFinalized = false;
+
 function evaluateAchievements(profile) {
   const source = profile || {};
   const unlocked = [];
@@ -987,19 +996,11 @@ let cloudProfile = null;
 let profileSyncTimer = null;
 let profileSyncInFlight = null;
 let profileSyncQueued = false;
-let unlockedAchievements = [];
-let availableTitles = [];
-let equippedTitle = null;
-let achievementRewardClaims = [];
-let recentAchievementRewardId = null;
-let recentAchievementRewardTimer = null;
 let questDate = null;
 let raceId = params.get('race');
 let raceData = null;
-let seasonState = null;
 let reviveUsedDate = localStorage.getItem('mochi-bird-revive-date') || null;
 let lastReviveSnapshot = null;
-let deathFinalized = false;
 let deathTimer = 0;
 let reviveConfirmResolver = null;
 
