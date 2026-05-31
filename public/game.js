@@ -646,10 +646,11 @@ const POWERUP_DURATION = {
   magnet: 6,
   shield: 1,
   canrush: 8,
+  rainbow: 15,
 };
 
 let powerups = [];
-let activePowerups = { magnet: 0, shield: false, canrush: 0 };
+let activePowerups = { magnet: 0, shield: false, canrush: 0, rainbow: 0 };
 let shieldFlash = 0; // timer for white flash effect
 
 function getGravityMult() {
@@ -658,6 +659,10 @@ function getGravityMult() {
 
 function getCanRushMult() {
   return activePowerups.canrush > 0 ? 2 : 1;
+}
+
+function isRainbowActive() {
+  return activePowerups.rainbow > 0;
 }
 
 // ── Pause ─────────────────────────────────────────────────────────────────────
@@ -1862,7 +1867,7 @@ function resetGame() {
   dyingVy          = 0;
   if (pauseBtnEl) { pauseBtnEl.textContent = '⏸'; }
   challengeSessionCans = 0;
-  activePowerups   = { magnet: 0, shield: false, canrush: 0 };
+  activePowerups   = { magnet: 0, shield: false, canrush: 0, rainbow: 0 };
 
   // Per-run stats
   runCans        = 0;
@@ -1886,7 +1891,9 @@ function addPipe() {
       ? 'magnet'
       : roll < 0.55
         ? 'shield'
-        : 'canrush';
+        : roll < 0.77
+          ? 'canrush'
+          : 'rainbow';
     const gapCenter = topH + gap / 2;
     powerups.push({ x: W + 30 + PIPE_W / 2, y: gapCenter, type, collected: false });
   }
@@ -2057,6 +2064,10 @@ function update(dt) {
     activePowerups.canrush -= dt;
     if (activePowerups.canrush < 0) activePowerups.canrush = 0;
   }
+  if (activePowerups.rainbow > 0) {
+    activePowerups.rainbow -= dt;
+    if (activePowerups.rainbow < 0) activePowerups.rainbow = 0;
+  }
   if (shieldFlash > 0) shieldFlash -= dt;
 
   // ── New best banner timer ────────────────────────────────────────────────
@@ -2078,11 +2089,11 @@ function update(dt) {
 
   // Ground
   if (bird.y + HIT_R >= H - GROUND_H) {
-    if (activePowerups.shield) {
+    if (activePowerups.shield || isRainbowActive()) {
       activePowerups.shield = false;
       shieldFlash = 0.3;
       bird.y = H - GROUND_H - HIT_R - 1;
-      bird.vy = FLAP_VEL * 0.5;
+      bird.vy = isRainbowActive() ? FLAP_VEL * 0.65 : FLAP_VEL * 0.5;
       triggerShake(5);
     } else {
       killBird();
@@ -2108,6 +2119,8 @@ function update(dt) {
         triggerShake(5);
         // Push bird out of pipe
         bird.x = p.x - HIT_R - 2;
+      } else if (isRainbowActive()) {
+        triggerShake(2);
       } else {
         killBird();
         return;
@@ -2225,7 +2238,7 @@ function update(dt) {
       }
 
       // Hit detection — skip if shield active or invincible
-      if (hellInvincible <= 0 && !activePowerups.shield) {
+      if (hellInvincible <= 0 && !activePowerups.shield && !isRainbowActive()) {
         const dx = bird.x - fb.x, dy = bird.y - fb.y;
         if (dx * dx + dy * dy < (HIT_R + fb.r) * (HIT_R + fb.r)) {
           hellHealth--;
@@ -2266,6 +2279,9 @@ function update(dt) {
       } else if (p.type === 'canrush') {
         activePowerups.canrush = POWERUP_DURATION.canrush;
         showToast('🥫 Can rush! (8s)');
+      } else if (p.type === 'rainbow') {
+        activePowerups.rainbow = POWERUP_DURATION.rainbow;
+        showToast('🌈 Rainbow star! (15s)');
       }
       if (particlesEnabled) spawnParticles(p.x, p.y, { count: 8, colors: ['#fff', '#ffc857'], speed: 70, life: 0.5 });
     }
@@ -3181,6 +3197,8 @@ function drawBird(overrideY, overrideTilt) {
   ctx.translate(bird.x, displayY);
   ctx.rotate(tilt);
 
+  const rainbowActive = isRainbowActive();
+
   // Shield flash effect
   if (shieldFlash > 0) {
     ctx.globalAlpha = shieldFlash / 0.3;
@@ -3191,6 +3209,25 @@ function drawBird(overrideY, overrideTilt) {
     ctx.globalAlpha = 1;
   }
 
+  if (rainbowActive) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const aura = ctx.createRadialGradient(0, 0, bird.r * 0.35, 0, 0, bird.r * 3.1);
+    const phase = (elapsedMs * 0.22) % 360;
+    aura.addColorStop(0.00, `hsla(${phase}, 100%, 72%, .95)`);
+    aura.addColorStop(0.17, `hsla(${(phase + 55) % 360}, 100%, 68%, .72)`);
+    aura.addColorStop(0.34, `hsla(${(phase + 110) % 360}, 100%, 65%, .58)`);
+    aura.addColorStop(0.51, `hsla(${(phase + 165) % 360}, 100%, 64%, .42)`);
+    aura.addColorStop(0.68, `hsla(${(phase + 220) % 360}, 100%, 66%, .30)`);
+    aura.addColorStop(0.85, `hsla(${(phase + 275) % 360}, 100%, 68%, .18)`);
+    aura.addColorStop(1.00, 'rgba(255,255,255,0)');
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, bird.r * 3.05, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   const displaySkin = currentSkin;
   const clipR   = bird.r * 2.3;
   const displayH = bird.r * 5.2;
@@ -3199,6 +3236,9 @@ function drawBird(overrideY, overrideTilt) {
   const effectiveImg = (hellMode && (equippedSkinId === 'default' || equippedSkinId === 'hell-bird'))
     ? hellBirdImg
     : img;
+  if (rainbowActive) {
+    ctx.filter = `hue-rotate(${(elapsedMs * 0.65) % 360}deg) saturate(2.2) brightness(1.12)`;
+  }
   if (effectiveImg && effectiveImg.complete && effectiveImg.naturalWidth > 0) {
     // Regular sprite
     const displayW = displayH * (effectiveImg.naturalWidth / effectiveImg.naturalHeight);
@@ -3228,6 +3268,7 @@ function drawBird(overrideY, overrideTilt) {
     ctx.ellipse(-3, 4, 9, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.filter = 'none';
 
   ctx.restore();
 }
@@ -3362,6 +3403,7 @@ function drawPowerups() {
     if (p.type === 'magnet')       col = '#ff6eb4';
     else if (p.type === 'shield')  col = '#4af0f0';
     else if (p.type === 'canrush') col = '#66d19e';
+    else if (p.type === 'rainbow') col = '#ff6eb4';
     else                            col = '#c47aff';
 
     glow.addColorStop(0, col + 'cc');
@@ -3388,6 +3430,7 @@ function drawPowerups() {
     const label = p.type === 'magnet' ? '🧲'
       : p.type === 'shield' ? '🛡'
       : p.type === 'canrush' ? '🥫'
+      : p.type === 'rainbow' ? '🌈'
       : '❖';
     ctx.fillText(label, 0, 0);
 
@@ -3400,6 +3443,7 @@ function drawActivePowerupHUD() {
   if (activePowerups.magnet > 0)   items.push({ label: '🧲', timer: activePowerups.magnet, max: POWERUP_DURATION.magnet, col: '#ff6eb4' });
   if (activePowerups.shield)       items.push({ label: '🛡', timer: 1, max: POWERUP_DURATION.shield, col: '#4af0f0' });
   if (activePowerups.canrush > 0)   items.push({ label: '🥫', timer: activePowerups.canrush, max: POWERUP_DURATION.canrush, col: '#66d19e' });
+  if (activePowerups.rainbow > 0)   items.push({ label: '🌈', timer: activePowerups.rainbow, max: POWERUP_DURATION.rainbow, col: '#ff66cc' });
 
   let ox = W / 2 - (items.length * 44) / 2;
   for (const item of items) {

@@ -19,7 +19,7 @@ It includes:
 - async friend challenges and race links
 - server-side score plausibility checks
 - once-per-day free revives with an expensive paid fallback
-- collectable power-ups like magnet, shield, and can rush
+- collectable power-ups like magnet, shield, rainbow star, and can rush
 - optional Discord Activity mode
 
 ## Quick start
