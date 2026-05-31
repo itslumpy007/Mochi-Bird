@@ -21,6 +21,9 @@ const storeBalanceEl  = document.getElementById('storeBalance');
 const skinGridEl      = document.getElementById('skinGrid');
 const pauseBtnEl      = document.getElementById('pauseBtn');
 const shareBtn        = document.getElementById('shareBtn');
+const reviveBtn       = document.getElementById('reviveBtn');
+const challengeBtn    = document.getElementById('challengeBtn');
+const reviveCountdownEl = document.getElementById('reviveCountdown');
 const challengesBtnEl = document.getElementById('challengesBtn');
 const challengesModalEl = document.getElementById('challengesModal');
 const challengesCloseBtnEl = document.getElementById('challengesCloseBtn');
@@ -32,6 +35,25 @@ const statsBtnEl      = document.getElementById('statsBtn');
 const statsModalEl    = document.getElementById('statsModal');
 const statsCloseBtnEl = document.getElementById('statsCloseBtn');
 const statsGridEl     = document.getElementById('statsGrid');
+const statsRunsEl     = document.getElementById('statsRuns');
+const reviveSummaryEl = document.getElementById('reviveSummary');
+const achievementSummaryEl = document.getElementById('achievementSummary');
+const achievementListEl    = document.getElementById('achievementList');
+const titlePickerEl        = document.getElementById('titlePicker');
+const equippedTitleEl      = document.getElementById('equippedTitle');
+const playerTitleEl        = document.getElementById('playerTitle');
+const seasonBadgeEl        = document.getElementById('seasonBadge');
+const reviveBadgeEl        = document.getElementById('reviveBadge');
+const seasonNameEl         = document.getElementById('seasonName');
+const seasonCopyEl         = document.getElementById('seasonCopy');
+const seasonPillEl         = document.getElementById('seasonPill');
+const seasonProgressBarEl  = document.getElementById('seasonProgressBar');
+const seasonMetaEl         = document.getElementById('seasonMeta');
+const reviveConfirmModalEl  = document.getElementById('reviveConfirmModal');
+const reviveConfirmTextEl   = document.getElementById('reviveConfirmText');
+const reviveConfirmBtnEl    = document.getElementById('reviveConfirmBtn');
+const reviveCancelBtnEl     = document.getElementById('reviveCancelBtn');
+const reviveCancelBtn2El    = document.getElementById('reviveCancelBtn2');
 const lbTabAllEl      = document.getElementById('lbTabAll');
 const lbTabTodayEl    = document.getElementById('lbTabToday');
 
@@ -46,6 +68,7 @@ const PIPE_INTERVAL = 1.35;
 const GROUND_H      = 90;
 const CAN_R         = 9;
 const HIT_R         = 10;    // collision radius (smaller than visual for fair play)
+const REVIVE_COST   = 2500;
 
 // Difficulty helpers
 let difficulty = localStorage.getItem('mochi-bird-difficulty') || 'normal';
@@ -74,6 +97,308 @@ bobaSheet.addEventListener('load', () => {
 function makeSheetSkin(id, name, price, col, row) {
   return { id, name, price, src: null, img: null, sheet: bobaSheet, col, row, sheetCols: 4, sheetRows: 2, trim: 0 };
 }
+
+function normalizeRunEntry(entry) {
+  if (typeof entry === 'number') {
+    return {
+      score: Math.max(0, Math.floor(entry)),
+      durationMs: 0,
+      reason: 'legacy',
+      playedAt: null,
+      cansEarned: 0,
+      combo: 0,
+      pipes: Math.max(0, Math.floor(entry)),
+    };
+  }
+
+  if (!entry || typeof entry !== 'object') return null;
+
+  const score = Math.max(0, Math.floor(Number(entry.score) || 0));
+  return {
+    score,
+    durationMs: Math.max(0, Math.floor(Number(entry.durationMs) || 0)),
+    reason: typeof entry.reason === 'string' && entry.reason ? entry.reason : 'game_over',
+    playedAt: typeof entry.playedAt === 'string' ? entry.playedAt : null,
+    cansEarned: Math.max(0, Math.floor(Number(entry.cansEarned) || 0)),
+    combo: Math.max(0, Math.floor(Number(entry.combo) || 0)),
+    pipes: Math.max(0, Math.floor(Number(entry.pipes ?? score) || score)),
+  };
+}
+
+function runEntryScore(entry) {
+  if (!entry || typeof entry === 'number') return Math.max(0, Math.floor(Number(entry) || 0));
+  return Math.max(0, Math.floor(Number(entry.score) || 0));
+}
+
+const ACHIEVEMENTS = [
+  { id: 'first_run', name: 'First Flight', desc: 'Complete your first run.', reward: { kind: 'cans', amount: 35 }, unlockedBy: p => (p.totalGames || 0) >= 1 },
+  { id: 'score_10', name: 'Pipe Starter', desc: 'Reach a best score of 10.', reward: { kind: 'title', title: 'Pipe Starter' }, rewardTitle: 'Pipe Starter', unlockedBy: p => (p.bestScoreEver || 0) >= 10 },
+  { id: 'score_25', name: 'Pipe Breaker', desc: 'Reach a best score of 25.', reward: { kind: 'skin', skinId: 'walmart-employee', fallbackCans: 90 }, unlockedBy: p => (p.bestScoreEver || 0) >= 25 },
+  { id: 'score_50', name: 'Sky Diver', desc: 'Reach a best score of 50.', reward: { kind: 'cans', amount: 200 }, unlockedBy: p => (p.bestScoreEver || 0) >= 50 },
+  { id: 'combo_10', name: 'Combo Artist', desc: 'Hit a combo of 10.', reward: { kind: 'title', title: 'Combo Artist' }, rewardTitle: 'Combo Artist', unlockedBy: p => (p.bestComboEver || 0) >= 10 },
+  { id: 'combo_25', name: 'Chain Monarch', desc: 'Hit a combo of 25.', reward: { kind: 'skin', skinId: 'boba-matcha', fallbackCans: 120 }, unlockedBy: p => (p.bestComboEver || 0) >= 25 },
+  { id: 'streak_7', name: 'Daily Regular', desc: 'Hold a 7-day streak.', reward: { kind: 'cans', amount: 80 }, unlockedBy: p => (p.streakCount || 0) >= 7 },
+  { id: 'streak_30', name: 'Streak Emperor', desc: 'Hold a 30-day streak.', reward: { kind: 'title', title: 'Streak Emperor' }, rewardTitle: 'Streak Emperor', unlockedBy: p => (p.streakCount || 0) >= 30 },
+  { id: 'collector_10', name: 'Collector', desc: 'Own at least 10 skins.', reward: { kind: 'skin', skinId: 'watermelon-01', fallbackCans: 140 }, unlockedBy: p => (p.ownedSkins?.length || 0) >= 10 },
+  { id: 'can_1000', name: 'Can Hoarder', desc: 'Earn 1,000 cans lifetime.', reward: { kind: 'cans', amount: 300 }, unlockedBy: p => (p.totalCansEarned || 0) >= 1000 },
+];
+
+function evaluateAchievements(profile) {
+  const source = profile || {};
+  const unlocked = [];
+  const titles = [];
+
+  for (const achievement of ACHIEVEMENTS) {
+    if (achievement.unlockedBy(source)) {
+      unlocked.push(achievement.id);
+      if (achievement.reward?.kind === 'title' && achievement.reward.title) titles.push(achievement.reward.title);
+    }
+  }
+
+  const unlockedSet = new Set([...(Array.isArray(source.unlockedAchievements) ? source.unlockedAchievements : []), ...unlocked]);
+  const availableTitles = [...new Set(titles)];
+  const equippedTitle = typeof source.equippedTitle === 'string' && availableTitles.includes(source.equippedTitle)
+    ? source.equippedTitle
+    : availableTitles[0] || null;
+
+  return {
+    unlockedAchievements: [...unlockedSet],
+    availableTitles,
+    equippedTitle,
+  };
+}
+
+function achievementRewardLabel(achievement) {
+  const reward = achievement?.reward;
+  if (!reward) return 'Reward unlocked';
+  if (reward.kind === 'cans') return `+${reward.amount} cans`;
+  if (reward.kind === 'title') return `Title: ${reward.title}`;
+  if (reward.kind === 'skin') {
+    const skin = SKINS.find(s => s.id === reward.skinId);
+    return `Free skin: ${skin?.name || reward.skinId}`;
+  }
+  return 'Reward unlocked';
+}
+
+function skinNameForId(skinId) {
+  return SKINS.find(s => s.id === skinId)?.name || skinId;
+}
+
+function achievementRewardKindLabel(achievement) {
+  const kind = achievement?.reward?.kind;
+  if (kind === 'cans') return 'Can reward';
+  if (kind === 'title') return 'Title reward';
+  if (kind === 'skin') return 'Cosmetic reward';
+  return 'Reward';
+}
+
+function flashAchievementReward(achievementId) {
+  recentAchievementRewardId = achievementId || null;
+  clearTimeout(recentAchievementRewardTimer);
+  if (!recentAchievementRewardId) return;
+  recentAchievementRewardTimer = setTimeout(() => {
+    recentAchievementRewardId = null;
+    recentAchievementRewardTimer = null;
+    if (achievementListEl) renderStats();
+  }, 1800);
+}
+
+function getAchievementRewardClaimSet(profile = {}) {
+  const source = Array.isArray(profile.achievementRewardClaims) ? profile.achievementRewardClaims : achievementRewardClaims;
+  return new Set(source);
+}
+
+function applyAchievementReward(achievement, { claimSet } = {}) {
+  if (!achievement?.reward) return false;
+  const reward = achievement.reward;
+  let changed = false;
+
+  if (reward.kind === 'cans') {
+    lifetimeCans += reward.amount;
+    localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+    canCountEl.textContent = String(lifetimeCans);
+    if (storeBalanceEl) storeBalanceEl.textContent = String(lifetimeCans);
+    showToast(`Achievement reward: +${reward.amount} cans`);
+    changed = true;
+  } else if (reward.kind === 'title') {
+    showToast(`Achievement reward: title ${reward.title}`);
+  } else if (reward.kind === 'skin') {
+    const skin = reward.skinId;
+    if (skin && !ownedSkins.has(skin)) {
+      ownedSkins.add(skin);
+      localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
+      refreshAnimSkins();
+      showToast(`Achievement reward: ${skinNameForId(skin)} unlocked`);
+      changed = true;
+    } else if (reward.fallbackCans) {
+      lifetimeCans += reward.fallbackCans;
+      localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+      canCountEl.textContent = String(lifetimeCans);
+      if (storeBalanceEl) storeBalanceEl.textContent = String(lifetimeCans);
+      showToast(`Achievement reward: +${reward.fallbackCans} cans`);
+      changed = true;
+    }
+    if (typeof renderStore === 'function') renderStore();
+  }
+
+  if (claimSet && !claimSet.has(achievement.id)) {
+    claimSet.add(achievement.id);
+    changed = true;
+    flashAchievementReward(achievement.id);
+  }
+
+  return changed;
+}
+
+function grantAchievementRewards(profile = getProfileSnapshot()) {
+  const unlockedSet = new Set(Array.isArray(profile.unlockedAchievements) ? profile.unlockedAchievements : unlockedAchievements);
+  const claimSet = getAchievementRewardClaimSet(profile);
+  let changed = false;
+
+  for (const achievement of ACHIEVEMENTS) {
+    if (!unlockedSet.has(achievement.id)) continue;
+    if (claimSet.has(achievement.id)) continue;
+    changed = applyAchievementReward(achievement, { claimSet }) || changed;
+  }
+
+  const claims = [...claimSet];
+  if (claims.length !== achievementRewardClaims.length || claims.some((id, idx) => id !== achievementRewardClaims[idx])) {
+    achievementRewardClaims = claims;
+    localStorage.setItem('mochi-bird-achievement-reward-claims', JSON.stringify(achievementRewardClaims));
+    changed = true;
+  }
+
+  return changed;
+}
+
+const SEASONS = [
+  {
+    id: 'spring',
+    name: 'Spring Bloom',
+    pill: 'Bloom Season',
+    copy: 'Light, fast, and a little wild. Earn seasonal points by finishing runs to unlock the Spring Bloom title.',
+    accent: '#66d19e',
+    gold: '#f4d35e',
+    bgTop: '#dff9f1',
+    bgBottom: '#f8d6e7',
+    rewardTitle: 'Bloom Runner',
+  },
+  {
+    id: 'summer',
+    name: 'Summer Surge',
+    pill: 'Surge Season',
+    copy: 'Hot streaks, higher pressure. Clear runs to build season points and claim the Summer Surge title.',
+    accent: '#ff9f43',
+    gold: '#ffd166',
+    bgTop: '#ffe7b3',
+    bgBottom: '#ff9d7f',
+    rewardTitle: 'Sun Chaser',
+  },
+  {
+    id: 'autumn',
+    name: 'Autumn Drift',
+    pill: 'Drift Season',
+    copy: 'Fall colors, steady climbs. Stack season points to unlock the Autumn Drift title before the season rotates.',
+    accent: '#d97706',
+    gold: '#f59e0b',
+    bgTop: '#fce7c2',
+    bgBottom: '#d9a66c',
+    rewardTitle: 'Harvest Rider',
+  },
+  {
+    id: 'winter',
+    name: 'Winter Glow',
+    pill: 'Glow Season',
+    copy: 'Cold air, clean lines. Keep flying to bank season points and claim the Winter Glow title.',
+    accent: '#6cc6ff',
+    gold: '#a7f3ff',
+    bgTop: '#dff6ff',
+    bgBottom: '#8ab7e8',
+    rewardTitle: 'Frost Flyer',
+  },
+];
+
+function getSeasonForDate(date = new Date()) {
+  const month = date.getMonth();
+  if (month >= 2 && month <= 4) return SEASONS[0];
+  if (month >= 5 && month <= 7) return SEASONS[1];
+  if (month >= 8 && month <= 10) return SEASONS[2];
+  return SEASONS[3];
+}
+
+function getSeasonRewardThreshold() {
+  return 120;
+}
+
+function getSeasonPoints(profile = {}) {
+  return Math.max(0, Math.floor(Number(profile.seasonPoints ?? 0)));
+}
+
+function evaluateSeasonState(profile = {}) {
+  const currentSeason = getSeasonForDate();
+  const storedSeasonId = typeof profile.seasonId === 'string' ? profile.seasonId : null;
+  const seasonId = storedSeasonId === currentSeason.id ? currentSeason.id : currentSeason.id;
+  const seasonPoints = storedSeasonId === currentSeason.id ? getSeasonPoints(profile) : 0;
+  const rewardClaimed = storedSeasonId === currentSeason.id ? !!profile.seasonRewardClaimed : false;
+  const rewardUnlocked = seasonPoints >= getSeasonRewardThreshold() || rewardClaimed;
+  return {
+    ...currentSeason,
+    seasonId,
+    seasonPoints,
+    rewardClaimed,
+    rewardUnlocked,
+  };
+}
+
+function applySeasonTheme(season = getSeasonForDate()) {
+  if (!season) return;
+  const root = document.documentElement;
+  root.style.setProperty('--season-accent', season.accent);
+  root.style.setProperty('--season-gold', season.gold);
+  root.style.setProperty('--season-bg-top', season.bgTop);
+  root.style.setProperty('--season-bg-bottom', season.bgBottom);
+  document.body.style.background = `linear-gradient(180deg, ${season.bgTop} 0%, ${season.bgBottom} 100%)`;
+  const themeColor = document.querySelector('meta[name="theme-color"]');
+  if (themeColor) themeColor.setAttribute('content', season.accent);
+}
+
+function syncSeasonTitles() {
+  const season = seasonState || evaluateSeasonState(getProfileSnapshot());
+  const rewardUnlocked = season.rewardUnlocked;
+  const rewardTitle = rewardUnlocked ? season.rewardTitle : null;
+  const seasonTitles = rewardTitle ? [rewardTitle] : [];
+  const mergedTitles = [...new Set([...(availableTitles || []), ...seasonTitles])];
+  availableTitles = mergedTitles;
+  if (!equippedTitle || !availableTitles.includes(equippedTitle)) {
+    equippedTitle = availableTitles[0] || null;
+  }
+}
+
+function updateSeasonUI() {
+  const season = seasonState || evaluateSeasonState(getProfileSnapshot());
+  if (seasonBadgeEl) seasonBadgeEl.textContent = `${season.pill} · ${season.name}`;
+  if (seasonNameEl) seasonNameEl.textContent = season.name;
+  if (seasonCopyEl) seasonCopyEl.textContent = season.copy;
+  if (seasonPillEl) seasonPillEl.textContent = season.pill;
+  if (seasonProgressBarEl) {
+    const pct = Math.min(100, Math.round((season.seasonPoints / getSeasonRewardThreshold()) * 100));
+    seasonProgressBarEl.style.width = `${pct}%`;
+  }
+  if (seasonMetaEl) {
+    const rewardLabel = season.rewardUnlocked
+      ? `Reward unlocked: ${season.rewardTitle}`
+      : `Reward at ${getSeasonRewardThreshold()} points: ${season.rewardTitle}`;
+    seasonMetaEl.textContent = `${season.seasonPoints} season points · ${rewardLabel}`;
+  }
+}
+
+seasonState = evaluateSeasonState({
+  seasonId: localStorage.getItem('mochi-bird-season-id'),
+  seasonPoints: Number(localStorage.getItem('mochi-bird-season-points') || 0),
+  seasonRewardClaimed: localStorage.getItem('mochi-bird-season-reward-claimed') === 'true',
+});
+applySeasonTheme(getSeasonForDate());
+updateSeasonUI();
 
 function drawCroppedImage(ctx2d, img, x, y, w, h, inset = 2) {
   const sw = Math.max(1, img.naturalWidth - inset * 2);
@@ -308,9 +633,24 @@ function getCanMult() {
 }
 
 // ── Power-ups ─────────────────────────────────────────────────────────────────
+const POWERUP_DURATION = {
+  magnet: 6,
+  shield: 1,
+  feather: 5,
+  canrush: 8,
+};
+
 let powerups = [];
-let activePowerups = { magnet: 0, shield: false };
+let activePowerups = { magnet: 0, shield: false, feather: 0, canrush: 0 };
 let shieldFlash = 0; // timer for white flash effect
+
+function getGravityMult() {
+  return activePowerups.feather > 0 ? 0.68 : 1;
+}
+
+function getCanRushMult() {
+  return activePowerups.canrush > 0 ? 2 : 1;
+}
 
 // ── Pause ─────────────────────────────────────────────────────────────────────
 let paused = false;
@@ -320,7 +660,10 @@ let tutorialActive = false;
 let tutorialStep   = 0;
 
 // ── Run history ───────────────────────────────────────────────────────────────
-let runHistory = JSON.parse(localStorage.getItem('mochi-bird-runs') || '[]');
+let runHistory = JSON.parse(localStorage.getItem('mochi-bird-runs') || '[]')
+  .map(normalizeRunEntry)
+  .filter(Boolean)
+  .slice(-25);
 
 // ── Daily streak ──────────────────────────────────────────────────────────────
 let streakCount = 0;
@@ -350,6 +693,7 @@ function checkStreak() {
   lifetimeCans += bonus;
   localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
   canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
   setTimeout(() => showToast(`🔥 Day ${streakCount} streak! +${bonus} cans`), 1000);
 }
 
@@ -390,11 +734,19 @@ function getTodaysChallenges() {
 
 function initChallenges() {
   const todayStr = new Date().toDateString();
+  questDate = todayStr;
   todaysChallenges = getTodaysChallenges();
-  const saved = JSON.parse(localStorage.getItem(`mochi-challenge-${todayStr}`) || '{}');
+  const saved = (cloudProfile?.questDate === todayStr && Array.isArray(cloudProfile?.questProgress))
+    ? Object.fromEntries(cloudProfile.questProgress.map(q => [q.id, q]))
+    : JSON.parse(localStorage.getItem(`mochi-challenge-${todayStr}`) || '{}');
   challengeProgress = {};
   for (const c of todaysChallenges) {
-    challengeProgress[c.id] = saved[c.id] || { value: 0, completed: false };
+    const q = saved[c.id] || { value: 0, completed: false, claimed: false };
+    challengeProgress[c.id] = {
+      value: Number(q.value) || 0,
+      completed: !!q.completed,
+      claimed: !!q.claimed,
+    };
   }
   challengeSessionCans  = 0;
   challengeSessionPlays = 0;
@@ -403,6 +755,8 @@ function initChallenges() {
 function saveChallengeProgress() {
   const todayStr = new Date().toDateString();
   localStorage.setItem(`mochi-challenge-${todayStr}`, JSON.stringify(challengeProgress));
+  questDate = todayStr;
+  scheduleCloudProfileSave();
 }
 
 function updateChallengeProgress(type, value) {
@@ -414,9 +768,11 @@ function updateChallengeProgress(type, value) {
       if (value >= c.target) {
         prog.value = c.target;
         prog.completed = true;
+        prog.claimed = true;
         lifetimeCans += c.reward;
         localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
         canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
         showToast(`🎯 Challenge done! +${c.reward} cans`);
       } else {
         prog.value = Math.max(prog.value, value);
@@ -426,9 +782,11 @@ function updateChallengeProgress(type, value) {
       if (prog.value >= c.target) {
         prog.value = c.target;
         prog.completed = true;
+        prog.claimed = true;
         lifetimeCans += c.reward;
         localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
         canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
         showToast(`🎯 Challenge done! +${c.reward} cans`);
       }
     }
@@ -439,7 +797,7 @@ function updateChallengeProgress(type, value) {
 function renderChallengesModal() {
   challengesListEl.innerHTML = '';
   for (const c of todaysChallenges) {
-    const prog = challengeProgress[c.id] || { value: 0, completed: false };
+    const prog = challengeProgress[c.id] || { value: 0, completed: false, claimed: false };
     const pct  = Math.min(1, prog.value / c.target);
     const div  = document.createElement('div');
     div.className = 'challenge-item' + (prog.completed ? ' completed' : '');
@@ -449,7 +807,7 @@ function renderChallengesModal() {
       <div class="challenge-meta">
         <span class="challenge-progress">${prog.value}/${c.target}</span>
         <span class="challenge-reward">+${c.reward} 🥫</span>
-        ${prog.completed ? '<span class="challenge-done">Done ✓</span>' : ''}
+        ${prog.completed ? `<span class="challenge-done">${prog.claimed ? 'Claimed ✓' : 'Done ✓'}</span>` : ''}
       </div>
     `;
     challengesListEl.appendChild(div);
@@ -574,6 +932,7 @@ function toggleMute() {
   }
   // Sync sound toggle in settings
   syncSettingsUI();
+  scheduleCloudProfileSave();
 }
 muteBtnEl.textContent = muted ? '🔇' : '🔊';
 muteBtnEl.addEventListener('click', toggleMute);
@@ -624,6 +983,560 @@ let sessionData = null;
 let lbEntries = [];
 let bestScoreKey = 'mochi-bird-best-practice';
 let lbMode = 'all';
+let cloudProfile = null;
+let profileSyncTimer = null;
+let profileSyncInFlight = null;
+let profileSyncQueued = false;
+let unlockedAchievements = [];
+let availableTitles = [];
+let equippedTitle = null;
+let achievementRewardClaims = [];
+let recentAchievementRewardId = null;
+let recentAchievementRewardTimer = null;
+let questDate = null;
+let raceId = params.get('race');
+let raceData = null;
+let seasonState = null;
+let reviveUsedDate = localStorage.getItem('mochi-bird-revive-date') || null;
+let lastReviveSnapshot = null;
+let deathFinalized = false;
+let deathTimer = 0;
+let reviveConfirmResolver = null;
+
+try {
+  unlockedAchievements = JSON.parse(localStorage.getItem('mochi-bird-unlocked-achievements') || '[]');
+} catch {
+  unlockedAchievements = [];
+}
+try {
+  achievementRewardClaims = JSON.parse(localStorage.getItem('mochi-bird-achievement-reward-claims') || '[]');
+} catch {
+  achievementRewardClaims = [];
+}
+availableTitles = [];
+equippedTitle = localStorage.getItem('mochi-bird-equipped-title') || null;
+
+function profileSyncAvailable() {
+  return !!sessionId && !isPractice && !!sessionData?.userId;
+}
+
+function getDiscordUserFallback() {
+  const user = window.discord?.user || {};
+  return {
+    userId: user.id || sessionData?.userId || '',
+    userTag: sessionData?.userTag || user.tag || user.username || user.global_name || 'Discord User',
+    avatarHash: sessionData?.avatarHash ?? user.avatar ?? null,
+    channelId: sessionData?.channelId || '',
+    guildId: sessionData?.guildId || '',
+  };
+}
+
+function todayKey() {
+  return new Date().toDateString();
+}
+
+function canUseFreeRevive() {
+  return reviveUsedDate !== todayKey();
+}
+
+function getNextFreeReviveLabel() {
+  if (canUseFreeRevive()) return 'Free revive available now';
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  return `Free revive resets ${tomorrow.toLocaleDateString([], { month: 'short', day: 'numeric' })}`;
+}
+
+function getReviveBadgeText() {
+  return canUseFreeRevive()
+    ? 'Revive: Free today'
+    : `Revive: ${REVIVE_COST} cans`;
+}
+
+function updateReviveBadgeUI() {
+  if (!reviveBadgeEl) return;
+  const free = canUseFreeRevive();
+  reviveBadgeEl.textContent = getReviveBadgeText();
+  reviveBadgeEl.classList.toggle('free', free);
+}
+
+function updateReviveCountdownUI() {
+  if (!reviveCountdownEl) return;
+  if (gameState !== 'dead') {
+    reviveCountdownEl.textContent = '';
+    return;
+  }
+
+  const untilAutoFinalize = Math.max(0, 8 - deathTimer);
+  const resetLabel = getNextFreeReviveLabel();
+  const reviveRule = canUseFreeRevive()
+    ? 'One revive is free today, or you can pay 2500 cans.'
+    : canAffordRevive()
+      ? `Revive now for ${REVIVE_COST} cans, or wait for the free reset.`
+      : `You need ${REVIVE_COST} cans to revive.`;
+  reviveCountdownEl.textContent = deathFinalized
+    ? `${resetLabel}`
+    : `Auto-finalizes in ${untilAutoFinalize.toFixed(0)}s · ${resetLabel} · ${reviveRule}`;
+}
+
+function openReviveConfirmModal() {
+  if (!reviveConfirmModalEl || !reviveConfirmTextEl) return Promise.resolve(false);
+  reviveConfirmTextEl.textContent = canUseFreeRevive()
+    ? 'Use your free revive for today?'
+    : `Spend ${REVIVE_COST} cans to revive this run?`;
+  reviveConfirmModalEl.classList.remove('hidden');
+
+  return new Promise(resolve => {
+    reviveConfirmResolver = resolve;
+  });
+}
+
+function closeReviveConfirmModal(result = false) {
+  if (reviveConfirmModalEl) reviveConfirmModalEl.classList.add('hidden');
+  if (reviveConfirmResolver) {
+    const resolve = reviveConfirmResolver;
+    reviveConfirmResolver = null;
+    resolve(result);
+  }
+}
+
+function getProfileSnapshot() {
+  const totalGames = Number(localStorage.getItem('mochi-bird-total-games') || 0);
+  const totalCansEarned = Number(localStorage.getItem('mochi-bird-total-cans-earned') || 0);
+  const totalPipes = Number(localStorage.getItem('mochi-bird-total-pipes') || 0);
+  const bestComboEver = Number(localStorage.getItem('mochi-bird-best-combo-ever') || 0);
+  const bestScoreEver = Math.max(
+    Number(localStorage.getItem('mochi-bird-best-score-ever') || 0),
+    Number(bestScore || 0),
+  );
+  const cansSpent = Number(localStorage.getItem('mochi-bird-cans-spent') || 0);
+  const achievementState = evaluateAchievements({
+    ownedSkins: [...ownedSkins],
+    totalGames,
+    totalCansEarned,
+    totalPipes,
+    bestComboEver,
+    bestScoreEver,
+    streakCount,
+    cansSpent,
+    unlockedAchievements,
+    equippedTitle,
+  });
+  const season = seasonState || evaluateSeasonState({
+    seasonId: cloudProfile?.seasonId,
+    seasonPoints: cloudProfile?.seasonPoints,
+    seasonRewardClaimed: cloudProfile?.seasonRewardClaimed,
+  });
+
+  return {
+    ownedSkins: [...ownedSkins],
+    equippedSkin: equippedSkinId,
+    lifetimeCans,
+    difficulty,
+    muted,
+    particlesEnabled,
+    hellMode,
+    runHistory: [...runHistory],
+    questDate,
+    questProgress: todaysChallenges.map(c => ({
+      id: c.id,
+      value: challengeProgress[c.id]?.value || 0,
+      completed: !!challengeProgress[c.id]?.completed,
+      claimed: !!challengeProgress[c.id]?.claimed,
+    })),
+    streakCount,
+    streakDate: localStorage.getItem('mochi-bird-streak-date') || null,
+    totalGames,
+    totalCansEarned,
+    totalPipes,
+    bestComboEver,
+    bestScoreEver,
+    cansSpent,
+    unlockedAchievements: achievementState.unlockedAchievements,
+    achievementRewardClaims,
+    equippedTitle: achievementState.equippedTitle,
+    seasonId: season.seasonId,
+    seasonPoints: season.seasonPoints,
+    seasonRewardClaimed: season.rewardClaimed,
+    reviveDate: reviveUsedDate,
+    tutorialDone: localStorage.getItem('mochi-bird-tutorial') === 'done',
+  };
+}
+
+function applyProfileSnapshot(profile) {
+  if (!profile) return;
+
+  cloudProfile = profile;
+  seasonState = evaluateSeasonState(profile);
+  const achievementState = syncAchievementState(profile);
+  equippedTitle = achievementState.equippedTitle || equippedTitle;
+
+  if (Array.isArray(profile.ownedSkins) && profile.ownedSkins.length) {
+    ownedSkins = new Set(profile.ownedSkins);
+  } else {
+    ownedSkins = new Set(['default']);
+  }
+
+  equippedSkinId = ownedSkins.has(profile.equippedSkin) ? profile.equippedSkin : 'default';
+  currentSkin = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
+
+  lifetimeCans = Number(profile.lifetimeCans ?? lifetimeCans ?? 0);
+  difficulty = ['easy', 'normal', 'hard'].includes(profile.difficulty) ? profile.difficulty : difficulty;
+  muted = typeof profile.muted === 'boolean' ? profile.muted : muted;
+  particlesEnabled = typeof profile.particlesEnabled === 'boolean' ? profile.particlesEnabled : particlesEnabled;
+  hellMode = typeof profile.hellMode === 'boolean' ? profile.hellMode : hellMode;
+  runHistory = Array.isArray(profile.runHistory)
+    ? profile.runHistory.map(normalizeRunEntry).filter(Boolean).slice(-25)
+    : runHistory;
+  questDate = typeof profile.questDate === 'string' ? profile.questDate : questDate;
+  if (questDate === new Date().toDateString() && Array.isArray(profile.questProgress)) {
+    const saved = Object.fromEntries(profile.questProgress.map(q => [q.id, q]));
+    challengeProgress = {};
+    for (const c of todaysChallenges) {
+      const q = saved[c.id] || { value: 0, completed: false, claimed: false };
+      challengeProgress[c.id] = {
+        value: Number(q.value) || 0,
+        completed: !!q.completed,
+        claimed: !!q.claimed,
+      };
+    }
+  }
+  streakCount = Number(profile.streakCount || 0);
+
+  if (profile.streakDate) localStorage.setItem('mochi-bird-streak-date', profile.streakDate);
+  localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
+  localStorage.setItem('mochi-bird-skin', equippedSkinId);
+  localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+  localStorage.setItem('mochi-bird-difficulty', difficulty);
+  localStorage.setItem('mochi-bird-muted', String(muted));
+  localStorage.setItem('mochi-bird-particles', String(particlesEnabled));
+  localStorage.setItem('mochi-bird-hell-mode', String(hellMode));
+  localStorage.setItem('mochi-bird-runs', JSON.stringify(runHistory));
+  localStorage.setItem('mochi-bird-total-games', String(Number(profile.totalGames || 0)));
+  localStorage.setItem('mochi-bird-total-cans-earned', String(Number(profile.totalCansEarned || 0)));
+  localStorage.setItem('mochi-bird-total-pipes', String(Number(profile.totalPipes || 0)));
+  localStorage.setItem('mochi-bird-best-combo-ever', String(Number(profile.bestComboEver || 0)));
+  localStorage.setItem('mochi-bird-best-score-ever', String(Number(profile.bestScoreEver || 0)));
+  localStorage.setItem('mochi-bird-cans-spent', String(Number(profile.cansSpent || 0)));
+  localStorage.setItem('mochi-bird-season-id', seasonState.seasonId);
+  localStorage.setItem('mochi-bird-season-points', String(seasonState.seasonPoints));
+  localStorage.setItem('mochi-bird-season-reward-claimed', String(seasonState.rewardClaimed));
+  achievementRewardClaims = Array.isArray(profile.achievementRewardClaims)
+    ? [...new Set(profile.achievementRewardClaims.filter(id => typeof id === 'string' && id.trim()))]
+    : achievementRewardClaims;
+  localStorage.setItem('mochi-bird-achievement-reward-claims', JSON.stringify(achievementRewardClaims));
+  reviveUsedDate = typeof profile.reviveDate === 'string' ? profile.reviveDate : reviveUsedDate;
+  if (reviveUsedDate) localStorage.setItem('mochi-bird-revive-date', reviveUsedDate);
+  else localStorage.removeItem('mochi-bird-revive-date');
+  localStorage.setItem('mochi-bird-unlocked-achievements', JSON.stringify(unlockedAchievements));
+  localStorage.setItem('mochi-bird-equipped-title', equippedTitle || '');
+  if (profile.tutorialDone) localStorage.setItem('mochi-bird-tutorial', 'done');
+
+  canCountEl.textContent = String(lifetimeCans);
+  bestScore = Math.max(bestScore, Number(profile.bestScoreEver || 0));
+  if (bestScoreKey !== 'mochi-bird-best-practice') {
+    localStorage.setItem(bestScoreKey, String(bestScore));
+  }
+  bestScoreEl.textContent = String(bestScore);
+  if (storeBalanceEl) storeBalanceEl.textContent = String(lifetimeCans);
+  muteBtnEl.textContent = muted ? '🔇' : '🔊';
+  updateTitleUI();
+  updateSeasonUI();
+  refreshAnimSkins();
+  syncSettingsUI();
+}
+
+function captureReviveSnapshot() {
+  lastReviveSnapshot = {
+    bird: { x: bird.x, y: bird.y, vy: bird.vy },
+    bgOffset,
+    spawnTimer,
+    pipes: pipes.map(p => ({ ...p })),
+    cans: cans.map(c => ({ ...c })),
+    powerups: powerups.map(p => ({ ...p })),
+    fireballs: fireballs.map(fb => ({ ...fb })),
+    lavaGeyserParticles: lavaGeyserParticles.map(p => ({ ...p })),
+    activePowerups: { ...activePowerups },
+    hellHealth,
+    hellInvincible,
+    shakeAmt,
+    shieldFlash,
+    paused,
+    newBestAchieved,
+    newBestAnimTimer,
+    combo,
+    maxCombo,
+    runCans,
+    runPipesCleared,
+    runPowerupsUsed,
+    runBestCombo,
+    sessionCans,
+    challengeSessionCans,
+  };
+}
+
+function restoreReviveSnapshot() {
+  if (!lastReviveSnapshot) return false;
+
+  const snap = lastReviveSnapshot;
+  bird = { ...bird, ...snap.bird };
+  bgOffset = snap.bgOffset;
+  spawnTimer = snap.spawnTimer;
+  pipes = snap.pipes.map(p => ({ ...p }));
+  cans = snap.cans.map(c => ({ ...c }));
+  powerups = snap.powerups.map(p => ({ ...p }));
+  fireballs = snap.fireballs.map(fb => ({ ...fb }));
+  lavaGeyserParticles = snap.lavaGeyserParticles.map(p => ({ ...p }));
+  activePowerups = { ...snap.activePowerups, shield: true };
+  hellHealth = snap.hellHealth;
+  hellInvincible = snap.hellInvincible;
+  shakeAmt = snap.shakeAmt;
+  shieldFlash = Math.max(0.25, snap.shieldFlash || 0);
+  paused = false;
+  dyingTimer = 0;
+  dyingVy = 0;
+  deathTimer = 0;
+  deathFinalized = false;
+  setGameState('playing');
+  if (pauseBtnEl) pauseBtnEl.textContent = '⏸';
+  statusEl.textContent = raceStatusText() || (isPractice ? 'Playing' : 'Session running');
+  updateTitleUI();
+  return true;
+}
+
+function buildReviveLabel() {
+  if (canUseFreeRevive()) return 'Revive Free Today';
+  if (canAffordRevive()) return `Revive ${REVIVE_COST} Cans`;
+  return `Need ${REVIVE_COST} Cans`;
+}
+
+function canAffordRevive() {
+  return lifetimeCans >= REVIVE_COST;
+}
+
+async function attemptRevive() {
+  if (gameState !== 'dead' || deathFinalized) return false;
+  const freeRevive = canUseFreeRevive();
+  if (!freeRevive && !canAffordRevive()) {
+    showToast(`Need ${REVIVE_COST} cans to revive`);
+    updateUI();
+    return false;
+  }
+
+  if (!freeRevive) {
+    const approved = await openReviveConfirmModal();
+    if (!approved) return false;
+    lifetimeCans -= REVIVE_COST;
+    localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
+    canCountEl.textContent = String(lifetimeCans);
+    if (storeBalanceEl) storeBalanceEl.textContent = String(lifetimeCans);
+    const spent = Number(localStorage.getItem('mochi-bird-cans-spent') || 0) + REVIVE_COST;
+    localStorage.setItem('mochi-bird-cans-spent', String(spent));
+  } else {
+    reviveUsedDate = todayKey();
+    localStorage.setItem('mochi-bird-revive-date', reviveUsedDate);
+  }
+
+  scheduleCloudProfileSave();
+  showToast(freeRevive ? 'Revived for free' : `Revived for ${REVIVE_COST} cans`);
+  sfx.powerup();
+  restoreReviveSnapshot();
+  return true;
+}
+
+function finalizeDeathRun() {
+  if (deathFinalized) return;
+  deathFinalized = true;
+  closeReviveConfirmModal(false);
+
+  // Save run history
+  runHistory.push(normalizeRunEntry({
+    score,
+    durationMs: Math.round(elapsedMs),
+    reason: 'hit_obstacle',
+    playedAt: new Date().toISOString(),
+    cansEarned: sessionCans,
+    combo: maxCombo,
+    pipes: score,
+  }));
+  if (runHistory.length > 25) runHistory = runHistory.slice(-25);
+  localStorage.setItem('mochi-bird-runs', JSON.stringify(runHistory));
+
+  // Challenge progress
+  challengeSessionPlays++;
+  updateChallengeProgress('plays', 1);
+  updateChallengeProgress('score', score);
+  updateChallengeProgress('combo', maxCombo);
+
+  // Lifetime stats
+  const totalGames = Number(localStorage.getItem('mochi-bird-total-games') || 0) + 1;
+  localStorage.setItem('mochi-bird-total-games', String(totalGames));
+  const totalCansEarned = Number(localStorage.getItem('mochi-bird-total-cans-earned') || 0) + sessionCans;
+  localStorage.setItem('mochi-bird-total-cans-earned', String(totalCansEarned));
+  const totalPipes = Number(localStorage.getItem('mochi-bird-total-pipes') || 0) + score;
+  localStorage.setItem('mochi-bird-total-pipes', String(totalPipes));
+  const bestComboEver = Math.max(Number(localStorage.getItem('mochi-bird-best-combo-ever') || 0), maxCombo);
+  localStorage.setItem('mochi-bird-best-combo-ever', String(bestComboEver));
+  const bestScoreEver = Math.max(Number(localStorage.getItem('mochi-bird-best-score-ever') || 0), score);
+  localStorage.setItem('mochi-bird-best-score-ever', String(bestScoreEver));
+  const seasonGain = Math.max(8, Math.floor(score * 3 + runCans + maxCombo));
+  seasonState = evaluateSeasonState({
+    seasonId: getSeasonForDate().id,
+    seasonPoints: getSeasonPoints(seasonState) + seasonGain,
+    seasonRewardClaimed: false,
+  });
+  if (seasonState.seasonPoints >= getSeasonRewardThreshold()) {
+    seasonState.rewardClaimed = true;
+  }
+  localStorage.setItem('mochi-bird-season-id', seasonState.seasonId);
+  localStorage.setItem('mochi-bird-season-points', String(seasonState.seasonPoints));
+  localStorage.setItem('mochi-bird-season-reward-claimed', String(seasonState.rewardClaimed));
+  syncAchievementState();
+  scheduleCloudProfileSave();
+  showToast(`Season +${seasonGain} points`);
+
+  submitScore();
+  if (score > bestScore) {
+    bestScore = score;
+    bestScoreEl.textContent = String(bestScore);
+    localStorage.setItem(bestScoreKey, String(bestScore));
+  }
+  updateUI();
+}
+
+async function saveCloudProfile() {
+  if (!profileSyncAvailable()) return null;
+  if (profileSyncInFlight) {
+    profileSyncQueued = true;
+    return profileSyncInFlight;
+  }
+
+  const body = { profile: getProfileSnapshot() };
+  profileSyncInFlight = fetch(`/api/session/${sessionId}/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+    .then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Profile save failed');
+      if (data.profile) {
+        cloudProfile = data.profile;
+      }
+      return data.profile || null;
+    })
+    .catch(err => {
+      console.warn('[profile] save failed:', err.message);
+      return null;
+    })
+    .finally(() => {
+      profileSyncInFlight = null;
+      if (profileSyncQueued) {
+        profileSyncQueued = false;
+        void saveCloudProfile();
+      }
+    });
+
+  return profileSyncInFlight;
+}
+
+function scheduleCloudProfileSave(delayMs = 300) {
+  syncAchievementState();
+  if (!profileSyncAvailable()) return;
+  clearTimeout(profileSyncTimer);
+  profileSyncTimer = setTimeout(() => {
+    profileSyncTimer = null;
+    void saveCloudProfile();
+  }, delayMs);
+}
+
+function updateTitleUI() {
+  if (playerTitleEl) {
+    playerTitleEl.textContent = equippedTitle ? `Title: ${equippedTitle}` : '';
+  }
+  updateReviveBadgeUI();
+}
+
+function syncAchievementState(profile = getProfileSnapshot(), { persist = false } = {}) {
+  const state = evaluateAchievements(profile);
+  unlockedAchievements = state.unlockedAchievements;
+  const season = seasonState || evaluateSeasonState(profile);
+  const seasonalTitles = season.rewardUnlocked ? [season.rewardTitle] : [];
+  availableTitles = [...new Set([...state.availableTitles, ...seasonalTitles])];
+  if (!equippedTitle || !availableTitles.includes(equippedTitle)) {
+    equippedTitle = state.equippedTitle || (season.rewardUnlocked ? season.rewardTitle : null);
+  }
+  localStorage.setItem('mochi-bird-unlocked-achievements', JSON.stringify(unlockedAchievements));
+  localStorage.setItem('mochi-bird-equipped-title', equippedTitle || '');
+  updateTitleUI();
+  updateSeasonUI();
+  const rewardsChanged = grantAchievementRewards(profile);
+  if (rewardsChanged && !persist) scheduleCloudProfileSave();
+  if (persist) scheduleCloudProfileSave();
+  return state;
+}
+
+function setEquippedTitle(title) {
+  equippedTitle = title || null;
+  syncAchievementState(getProfileSnapshot());
+  scheduleCloudProfileSave();
+  renderStats();
+}
+
+async function loadCloudProfile() {
+  if (!profileSyncAvailable()) return null;
+  try {
+    const res = await fetch(`/api/session/${sessionId}/profile`);
+    const data = await res.json();
+    if (!res.ok) return null;
+    applyProfileSnapshot(data.profile);
+    return data.profile || null;
+  } catch (err) {
+    console.warn('[profile] load failed:', err.message);
+    return null;
+  }
+}
+
+function raceStatusText() {
+  if (!raceData) return null;
+  const target = Number(raceData.targetScore || 0);
+  const viewer = raceData.viewerStatus;
+  if (viewer === 'ahead') return `Race: ahead of ${target}`;
+  if (viewer === 'tied') return `Race: tied ${target}`;
+  if (viewer === 'behind') return `Race: beat ${target}`;
+  return `Race target: ${target}`;
+}
+
+async function claimRaceSession() {
+  if (!raceId) return null;
+  const identity = getDiscordUserFallback();
+  if (!identity.userId || !identity.userTag) return null;
+  try {
+    const res = await fetch(`/api/race/${raceId}/claim`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: identity.userId,
+        userTag: identity.userTag,
+        avatarHash: identity.avatarHash,
+        channelId: identity.channelId,
+        guildId: identity.guildId,
+        baseUrl: location.origin,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) return null;
+    if (data.session) {
+      sessionData = data.session;
+      sessionId = data.session.id;
+      isPractice = false;
+    }
+    raceData = data.race || raceData;
+    return data;
+  } catch (err) {
+    console.warn('[race] claim failed:', err.message);
+    return null;
+  }
+}
 
 // ── State machine ──────────────────────────────────────────────────────────────
 function setGameState(state) {
@@ -661,6 +1574,30 @@ function updateUI() {
     }
   }
 
+  if (challengeBtn) {
+    if (gameState === 'dead' && sessionId && !isPractice) {
+      challengeBtn.classList.remove('hidden');
+      challengeBtn.disabled = false;
+    } else {
+      challengeBtn.classList.add('hidden');
+    }
+  }
+
+  if (reviveBtn) {
+    if (gameState === 'dead' && !deathFinalized) {
+      reviveBtn.classList.remove('hidden');
+      reviveBtn.disabled = !canUseFreeRevive() && !canAffordRevive();
+      reviveBtn.textContent = buildReviveLabel();
+      reviveBtn.title = canUseFreeRevive()
+        ? 'Use your free revive for today'
+        : canAffordRevive()
+          ? `Spend ${REVIVE_COST} cans to revive`
+          : `You need ${REVIVE_COST} cans to revive`;
+    } else {
+      reviveBtn.classList.add('hidden');
+    }
+  }
+
   switch (gameState) {
     case 'loading':
       hideOverlay();
@@ -681,7 +1618,7 @@ function updateUI() {
         statusEl.textContent = '⚠️ Practice mode (no recording)';
       } else {
         showOverlay('Ready', `Playing as ${sessionData?.userTag || 'guest'} — Scores recorded!`, 'Play');
-        statusEl.textContent = `✅ Session: ${sessionData?.userTag || 'guest'}`;
+        statusEl.textContent = raceStatusText() || `✅ Session: ${sessionData?.userTag || 'guest'}`;
       }
       startBtn.disabled = false;
       shopBtnEl.disabled = false;
@@ -695,7 +1632,7 @@ function updateUI() {
 
     case 'playing':
       hideOverlay();
-      statusEl.textContent = isPractice ? 'Playing' : 'Session running';
+      statusEl.textContent = raceStatusText() || (isPractice ? 'Playing' : 'Session running');
       startBtn.disabled = true;
       shopBtnEl.disabled = true;
       break;
@@ -706,16 +1643,25 @@ function updateUI() {
       shopBtnEl.disabled = true;
       break;
 
-    case 'dead':
+    case 'dead': {
+      updateReviveCountdownUI();
+      const reviveText = deathFinalized
+        ? 'Run saved. Hit Play Again to start a new one.'
+        : canUseFreeRevive()
+          ? 'One free revive is available today. You can also pay 2500 cans for another revive.'
+          : canAffordRevive()
+            ? `Revive now for ${REVIVE_COST} cans, or wait until tomorrow for a free revive.`
+            : `You need ${REVIVE_COST} cans to revive.`;
       showOverlay(
         `You scored ${score}`,
-        `🥫 ${runCans}  •  🔥 ${runBestCombo}x  •  ⚡ ${runPowerupsUsed}`,
-        'Play Again'
+        `🥫 ${runCans}  •  🔥 ${runBestCombo}x  •  ⚡ ${runPowerupsUsed}. ${reviveText}`,
+        deathFinalized ? 'Play Again' : 'Give Up'
       );
-      statusEl.textContent = `Game over — scored ${score}`;
+      statusEl.textContent = raceStatusText() ? `${raceStatusText()} • scored ${score}` : `Game over — scored ${score}`;
       startBtn.disabled = false;
       shopBtnEl.disabled = false;
       break;
+    }
 
     case 'error':
       showOverlay('Error', 'Session expired. Reload to try again.', 'Reload');
@@ -732,6 +1678,7 @@ startBtn.addEventListener('click', () => {
   }
 
   if (gameState === 'dead') {
+    finalizeDeathRun();
     resetGame();
     setGameState('menu');
     return;
@@ -746,6 +1693,30 @@ startBtn.addEventListener('click', () => {
     return;
   }
 });
+
+if (reviveBtn) {
+  reviveBtn.addEventListener('click', async () => {
+    const revived = await attemptRevive();
+    if (revived) {
+      updateUI();
+    }
+  });
+}
+
+if (reviveConfirmBtnEl) {
+  reviveConfirmBtnEl.addEventListener('click', () => closeReviveConfirmModal(true));
+}
+if (reviveCancelBtnEl) {
+  reviveCancelBtnEl.addEventListener('click', () => closeReviveConfirmModal(false));
+}
+if (reviveCancelBtn2El) {
+  reviveCancelBtn2El.addEventListener('click', () => closeReviveConfirmModal(false));
+}
+if (reviveConfirmModalEl) {
+  reviveConfirmModalEl.addEventListener('pointerdown', (e) => {
+    if (e.target === reviveConfirmModalEl) closeReviveConfirmModal(false);
+  });
+}
 
 // ── Overlay helpers ────────────────────────────────────────────────────────────
 function showOverlay(title, text, btnLabel = 'Start') {
@@ -862,6 +1833,7 @@ function resetGame() {
   sessionCans = 0;
   lifetimeCans = Number(localStorage.getItem('mochi-bird-cans') || 0);
   canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
 
   // Revert try-on preview if skin is unowned
   if (previewSkinId && !ownedSkins.has(previewSkinId)) {
@@ -884,19 +1856,22 @@ function resetGame() {
   combo            = 0;
   maxCombo         = 0;
   powerups         = [];
-  activePowerups   = { magnet: 0, shield: false };
   shieldFlash      = 0;
   paused           = false;
   dyingTimer       = 0;
   dyingVy          = 0;
   if (pauseBtnEl) { pauseBtnEl.textContent = '⏸'; }
   challengeSessionCans = 0;
+  activePowerups   = { magnet: 0, shield: false, feather: 0, canrush: 0 };
 
   // Per-run stats
   runCans        = 0;
   runPipesCleared = 0;
   runPowerupsUsed = 0;
   runBestCombo   = 0;
+  deathTimer     = 0;
+  deathFinalized = false;
+  lastReviveSnapshot = null;
 }
 
 function addPipe() {
@@ -906,8 +1881,14 @@ function addPipe() {
   spawnCans(topH, gap);
   // 15% chance to spawn a power-up in the gap
   if (Math.random() < 0.15) {
-    const types = ['magnet', 'shield'];
-    const type  = types[Math.floor(Math.random() * types.length)];
+    const roll = Math.random();
+    const type  = roll < 0.32
+      ? 'magnet'
+      : roll < 0.55
+        ? 'shield'
+        : roll < 0.75
+          ? 'feather'
+          : 'canrush';
     const gapCenter = topH + gap / 2;
     powerups.push({ x: W + 30 + PIPE_W / 2, y: gapCenter, type, collected: false });
   }
@@ -955,7 +1936,7 @@ async function submitScore() {
     const res = await fetch(`/api/session/${sessionId}/score`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ score, durationMs: Math.round(elapsedMs), reason: 'hit_obstacle' }),
+      body: JSON.stringify({ score, durationMs: Math.round(elapsedMs), reason: 'hit_obstacle', profile: getProfileSnapshot() }),
     });
     const data = await res.json();
     if (!res.ok) {
@@ -968,6 +1949,10 @@ async function submitScore() {
         }
         return;
       }
+      if (res.status === 422) {
+        showToast('Score rejected by verification');
+        return;
+      }
       throw new Error(data.error);
     }
 
@@ -975,6 +1960,16 @@ async function submitScore() {
     bestScore = Math.max(bestScore, pb);
     localStorage.setItem(bestScoreKey, String(bestScore));
     bestScoreEl.textContent = String(bestScore);
+    if (data.race) {
+      raceData = data.race;
+      const raceState = raceData.viewerStatus === 'ahead'
+        ? 'You are ahead in the race!'
+        : raceData.viewerStatus === 'tied'
+          ? 'Race is tied.'
+          : `Race target: ${raceData.targetScore}`;
+      showToast(raceState);
+      statusEl.textContent = raceStatusText() || statusEl.textContent;
+    }
     fetchLeaderboard();
   } catch (err) {
     console.error('Score submit failed:', err);
@@ -987,41 +1982,9 @@ async function submitScore() {
   }
 }
 
-function onDeath() {
-  // Save run history
-  runHistory.push(score);
-  if (runHistory.length > 10) runHistory = runHistory.slice(-10);
-  localStorage.setItem('mochi-bird-runs', JSON.stringify(runHistory));
-
-  // Challenge progress
-  challengeSessionPlays++;
-  updateChallengeProgress('plays', 1);
-  updateChallengeProgress('score', score);
-  updateChallengeProgress('combo', maxCombo);
-
-  // Lifetime stats
-  const totalGames = Number(localStorage.getItem('mochi-bird-total-games') || 0) + 1;
-  localStorage.setItem('mochi-bird-total-games', String(totalGames));
-  const totalCansEarned = Number(localStorage.getItem('mochi-bird-total-cans-earned') || 0) + sessionCans;
-  localStorage.setItem('mochi-bird-total-cans-earned', String(totalCansEarned));
-  const totalPipes = Number(localStorage.getItem('mochi-bird-total-pipes') || 0) + score;
-  localStorage.setItem('mochi-bird-total-pipes', String(totalPipes));
-  const bestComboEver = Math.max(Number(localStorage.getItem('mochi-bird-best-combo-ever') || 0), maxCombo);
-  localStorage.setItem('mochi-bird-best-combo-ever', String(bestComboEver));
-  const bestScoreEver = Math.max(Number(localStorage.getItem('mochi-bird-best-score-ever') || 0), score);
-  localStorage.setItem('mochi-bird-best-score-ever', String(bestScoreEver));
-
-  submitScore();
-  if (score > bestScore) {
-    bestScore = score;
-    bestScoreEl.textContent = String(bestScore);
-    localStorage.setItem(bestScoreKey, String(bestScore));
-  }
-  setGameState('dead');
-}
-
 function update(dt) {
   elapsedMs += dt * 1000;
+  updateReviveBadgeUI();
 
   if (gameState === 'loading') {
     const target = startupReady ? 1 : 0.85;
@@ -1067,18 +2030,38 @@ function update(dt) {
     // Update particles while dying
     updateParticles(dt);
     if (dyingTimer >= 0.65) {
-      onDeath();
+      deathTimer = 0;
+      deathFinalized = false;
+      setGameState('dead');
+    }
+    return;
+  }
+
+  if (gameState === 'dead') {
+    deathTimer += dt;
+    updateReviveCountdownUI();
+    if (!deathFinalized && deathTimer >= 8) {
+      finalizeDeathRun();
     }
     return;
   }
 
   if (gameState !== 'playing') return;
   if (paused) return;
+  captureReviveSnapshot();
 
   // ── Active power-up timers ────────────────────────────────────────────────
   if (activePowerups.magnet > 0) {
     activePowerups.magnet -= dt;
     if (activePowerups.magnet < 0) activePowerups.magnet = 0;
+  }
+  if (activePowerups.feather > 0) {
+    activePowerups.feather -= dt;
+    if (activePowerups.feather < 0) activePowerups.feather = 0;
+  }
+  if (activePowerups.canrush > 0) {
+    activePowerups.canrush -= dt;
+    if (activePowerups.canrush < 0) activePowerups.canrush = 0;
   }
   if (shieldFlash > 0) shieldFlash -= dt;
 
@@ -1088,7 +2071,7 @@ function update(dt) {
   // ── Particles ─────────────────────────────────────────────────────────────
   updateParticles(dt);
 
-  bird.vy += GRAVITY * dt;
+  bird.vy += GRAVITY * dt * getGravityMult();
   bird.y += bird.vy * dt;
   const speed = curPipeSpeed();
   bgOffset = (bgOffset + speed * dt) % W;
@@ -1191,6 +2174,7 @@ function update(dt) {
       updateChallengeProgress('cans', 1);
       localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
       canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
       sfx.collect();
       const collectColors = hellMode ? ['#ff6600','#ffaa00','#ff4400'] : ['#ffc857','#fff','#ff6eb4'];
       if (particlesEnabled) spawnParticles(c.x, c.y, { count: 6, colors: collectColors, speed: 60, life: 0.5 });
@@ -1280,11 +2264,17 @@ function update(dt) {
       runPowerupsUsed++;
       sfx.powerup();
       if (p.type === 'magnet') {
-        activePowerups.magnet = 6;
+        activePowerups.magnet = POWERUP_DURATION.magnet;
         showToast('🧲 Magnet activated! (6s)');
       } else if (p.type === 'shield') {
         activePowerups.shield = true;
         showToast('🛡️ Shield activated!');
+      } else if (p.type === 'feather') {
+        activePowerups.feather = POWERUP_DURATION.feather;
+        showToast('🪶 Feather glide! (5s)');
+      } else if (p.type === 'canrush') {
+        activePowerups.canrush = POWERUP_DURATION.canrush;
+        showToast('🥫 Can rush! (8s)');
       }
       if (particlesEnabled) spawnParticles(p.x, p.y, { count: 8, colors: ['#fff', '#ffc857'], speed: 70, life: 0.5 });
     }
@@ -1485,36 +2475,16 @@ function handleSkinAction(skinId, action = 'buy-or-equip') {
   currentSkin    = skin;
   localStorage.setItem('mochi-bird-skin', skinId);
   refreshAnimSkins();
-  saveServerSkins();
+  scheduleCloudProfileSave();
   renderStore();
 }
 
 async function saveServerSkins() {
-  if (!sessionId || isPractice) return;
-  try {
-    await fetch(`/api/session/${sessionId}/skins`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ ownedSkins: [...ownedSkins], equippedSkin: equippedSkinId }),
-    });
-  } catch (err) { console.warn('[skins] save failed:', err.message); }
+  return saveCloudProfile();
 }
 
 async function loadServerSkins() {
-  if (!sessionId || isPractice) return;
-  try {
-    const res  = await fetch(`/api/session/${sessionId}/skins`);
-    const data = await res.json();
-    if (!res.ok) return;
-    (data.ownedSkins || []).forEach(id => ownedSkins.add(id));
-    localStorage.setItem('mochi-bird-owned', JSON.stringify([...ownedSkins]));
-    if (data.equippedSkin && ownedSkins.has(data.equippedSkin)) {
-      equippedSkinId = data.equippedSkin;
-      currentSkin    = SKINS.find(s => s.id === equippedSkinId) || SKINS[0];
-      localStorage.setItem('mochi-bird-skin', equippedSkinId);
-    }
-    refreshAnimSkins();
-  } catch (err) { console.warn('[skins] load failed:', err.message); }
+  return loadCloudProfile();
 }
 
 shopBtnEl.addEventListener('click', openStore);
@@ -1581,6 +2551,7 @@ if (settingsModalEl) {
     difficulty = btn.dataset.val;
     localStorage.setItem('mochi-bird-difficulty', difficulty);
     syncSettingsUI();
+    scheduleCloudProfileSave();
   });
   document.getElementById('soundToggle').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-val]');
@@ -1595,6 +2566,7 @@ if (settingsModalEl) {
     particlesEnabled = btn.dataset.val === 'on';
     localStorage.setItem('mochi-bird-particles', String(particlesEnabled));
     syncSettingsUI();
+    scheduleCloudProfileSave();
   });
 }
 
@@ -1602,21 +2574,141 @@ if (settingsModalEl) {
 function renderStats() {
   if (!statsGridEl) return;
   statsGridEl.innerHTML = '';
+  const profile = cloudProfile || getProfileSnapshot();
+  syncAchievementState(profile);
+  const currentRuns = Array.isArray(profile.runHistory) ? profile.runHistory : [];
+  const recentRuns = [...currentRuns].slice(-5).reverse();
+  const scoreRuns = currentRuns.map(runEntryScore);
+  const unlockedSet = new Set(unlockedAchievements);
+  const bestRun = scoreRuns.length ? Math.max(...scoreRuns) : 0;
+  const avgRun = scoreRuns.length ? Math.round(scoreRuns.reduce((sum, v) => sum + v, 0) / scoreRuns.length) : 0;
+  const season = seasonState || evaluateSeasonState(profile);
+
   const items = [
-    { label: 'Total Games Played',   value: localStorage.getItem('mochi-bird-total-games') || '0' },
-    { label: 'Total 🥫 Cans Earned', value: localStorage.getItem('mochi-bird-total-cans-earned') || '0' },
-    { label: 'Total Pipes Cleared',  value: localStorage.getItem('mochi-bird-total-pipes') || '0' },
-    { label: 'Best Combo Ever 🔥',   value: localStorage.getItem('mochi-bird-best-combo-ever') || '0' },
-    { label: 'Best Score Ever',      value: localStorage.getItem('mochi-bird-best-score-ever') || '0' },
-    { label: 'Current Streak 🔥',    value: String(streakCount) },
+    { label: 'Total Games Played',   value: String(profile.totalGames || localStorage.getItem('mochi-bird-total-games') || '0') },
+    { label: 'Total 🥫 Cans Earned', value: String(profile.totalCansEarned || localStorage.getItem('mochi-bird-total-cans-earned') || '0') },
+    { label: 'Total Pipes Cleared',  value: String(profile.totalPipes || localStorage.getItem('mochi-bird-total-pipes') || '0') },
+    { label: 'Best Combo Ever 🔥',   value: String(profile.bestComboEver || localStorage.getItem('mochi-bird-best-combo-ever') || '0') },
+    { label: 'Best Score Ever',      value: String(profile.bestScoreEver || localStorage.getItem('mochi-bird-best-score-ever') || '0') },
+    { label: 'Current Streak 🔥',    value: String(profile.streakCount ?? streakCount) },
     { label: 'Skins Owned',          value: String(ownedSkins.size) },
-    { label: 'Cans Spent',           value: localStorage.getItem('mochi-bird-cans-spent') || '0' },
+    { label: 'Cans Spent',           value: String(profile.cansSpent || localStorage.getItem('mochi-bird-cans-spent') || '0') },
+    { label: 'Achievement Rewards',  value: String(achievementRewardClaims.length) },
+    { label: 'Season Points',        value: String(season.seasonPoints) },
+    { label: 'Average Run',          value: String(avgRun) },
+    { label: 'Best Run',             value: String(bestRun) },
+    { label: 'Achievements',         value: String(unlockedAchievements.length) },
   ];
   for (const item of items) {
     const card = document.createElement('div');
     card.className = 'stat-card';
     card.innerHTML = `<div class="stat-value">${item.value}</div><div class="stat-label">${item.label}</div>`;
     statsGridEl.appendChild(card);
+  }
+
+  if (achievementSummaryEl) {
+    achievementSummaryEl.innerHTML = '';
+    const rewardCounts = ACHIEVEMENTS.reduce((acc, achievement) => {
+      const kind = achievement.reward?.kind || 'other';
+      acc[kind] = (acc[kind] || 0) + 1;
+      return acc;
+    }, {});
+    for (const text of [
+      `${unlockedAchievements.length}/${ACHIEVEMENTS.length} unlocked`,
+      equippedTitle ? `Equipped: ${equippedTitle}` : 'No title equipped',
+      `${achievementRewardClaims.length} rewards claimed`,
+      `Reward mix: ${rewardCounts.cans || 0} cans / ${rewardCounts.title || 0} titles / ${rewardCounts.skin || 0} cosmetics`,
+      season.rewardUnlocked ? `Season title: ${season.rewardTitle}` : `Next reward: ${season.rewardTitle}`,
+    ]) {
+      const pill = document.createElement('div');
+      pill.className = 'achievement-pill';
+      pill.textContent = text;
+      achievementSummaryEl.appendChild(pill);
+    }
+  }
+
+  if (reviveSummaryEl) {
+    reviveSummaryEl.innerHTML = '';
+    for (const text of [
+      getNextFreeReviveLabel(),
+      lifetimeCans >= REVIVE_COST ? `Can pay ${REVIVE_COST} cans to revive` : `Need ${REVIVE_COST - lifetimeCans} more cans for paid revive`,
+    ]) {
+      const pill = document.createElement('div');
+      pill.className = 'achievement-pill';
+      pill.textContent = text;
+      reviveSummaryEl.appendChild(pill);
+    }
+  }
+
+  if (titlePickerEl) {
+    titlePickerEl.innerHTML = '';
+    const titles = availableTitles.length ? availableTitles : [];
+    if (!titles.length) {
+      const empty = document.createElement('button');
+      empty.type = 'button';
+      empty.className = 'title-chip';
+      empty.disabled = true;
+      empty.textContent = 'No titles yet';
+      titlePickerEl.appendChild(empty);
+    } else {
+      for (const title of titles) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'title-chip' + (title === equippedTitle ? ' active-setting' : '');
+        btn.textContent = title;
+        btn.addEventListener('click', () => setEquippedTitle(title));
+        titlePickerEl.appendChild(btn);
+      }
+    }
+  }
+
+  if (achievementListEl) {
+    achievementListEl.innerHTML = '';
+    for (const achievement of ACHIEVEMENTS) {
+      const unlocked = unlockedSet.has(achievement.id);
+      const claimed = achievementRewardClaims.includes(achievement.id);
+      const card = document.createElement('div');
+      card.className = 'achievement-card'
+        + (unlocked ? ' unlocked' : '')
+        + (claimed ? ' claimed' : '')
+        + (recentAchievementRewardId === achievement.id ? ' reward-flash' : '');
+      card.innerHTML = `
+        <div class="achievement-name">${unlocked ? '✓ ' : ''}${achievement.name}</div>
+        <div class="achievement-desc">${achievement.desc}</div>
+        <div class="achievement-kind">${achievementRewardKindLabel(achievement)}</div>
+        <div class="achievement-reward">${unlocked ? `Reward claimed: ${achievementRewardLabel(achievement)}` : `Reward: ${achievementRewardLabel(achievement)}`}</div>
+      `;
+      achievementListEl.appendChild(card);
+    }
+  }
+
+  if (statsRunsEl) {
+    statsRunsEl.innerHTML = '';
+    if (!recentRuns.length) {
+      const empty = document.createElement('div');
+      empty.className = 'run-row';
+      empty.innerHTML = `<div class="run-row-score">0</div><div class="run-row-meta"><div class="run-row-reason">No runs yet</div><div class="run-row-sub">Play a round to populate your history.</div></div><div class="run-row-age">—</div>`;
+      statsRunsEl.appendChild(empty);
+      return;
+    }
+
+    for (const run of recentRuns) {
+      const row = document.createElement('div');
+      row.className = 'run-row';
+      const when = run.playedAt ? new Date(run.playedAt) : null;
+      const age = when && !Number.isNaN(when.getTime())
+        ? when.toLocaleDateString([], { month: 'short', day: 'numeric' })
+        : 'saved';
+      row.innerHTML = `
+        <div class="run-row-score">${run.score}</div>
+        <div class="run-row-meta">
+          <div class="run-row-reason">${run.reason || 'game_over'}</div>
+          <div class="run-row-sub">${run.durationMs ? `${Math.round(run.durationMs / 1000)}s · ` : ''}${run.cansEarned || 0} cans · ${run.combo || 0} combo</div>
+        </div>
+        <div class="run-row-age">${age}</div>
+      `;
+      statsRunsEl.appendChild(row);
+    }
   }
 }
 
@@ -1667,6 +2759,39 @@ if (shareBtn) {
       showToast('Score shared to Discord! 🎉');
     } catch (err) {
       shareBtn.disabled = false;
+    }
+  });
+}
+
+if (challengeBtn) {
+  challengeBtn.addEventListener('click', async () => {
+    if (!sessionId) return;
+    challengeBtn.disabled = true;
+    try {
+      const res = await fetch(`/api/session/${sessionId}/challenge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          targetScore: score,
+          score,
+          challengeMessage: `Beat ${sessionData?.userTag || 'me'}'s score of ${score}!`,
+          baseUrl: location.origin,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Challenge failed');
+      raceData = data.race || raceData;
+      const url = data.raceUrl || `${location.origin}/play?race=${data?.race?.id || ''}`;
+      if (url && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url).catch(() => {});
+      }
+      showToast('Challenge link copied!');
+      statusEl.textContent = raceStatusText() || statusEl.textContent;
+    } catch (err) {
+      console.warn('[race] challenge failed:', err.message);
+      showToast('Could not create challenge');
+    } finally {
+      challengeBtn.disabled = false;
     }
   });
 }
@@ -2246,9 +3371,11 @@ function drawPowerups() {
     // Glow
     const glow = ctx.createRadialGradient(0, 0, 4, 0, 0, 16);
     let col;
-    if (p.type === 'magnet')      col = '#ff6eb4';
-    else if (p.type === 'shield') col = '#4af0f0';
-    else                           col = '#c47aff';
+    if (p.type === 'magnet')       col = '#ff6eb4';
+    else if (p.type === 'shield')  col = '#4af0f0';
+    else if (p.type === 'feather') col = '#ffd166';
+    else if (p.type === 'canrush') col = '#66d19e';
+    else                            col = '#c47aff';
 
     glow.addColorStop(0, col + 'cc');
     glow.addColorStop(1, col + '00');
@@ -2271,7 +3398,11 @@ function drawPowerups() {
     ctx.font        = '11px sans-serif';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'middle';
-    const label = p.type === 'magnet' ? '🧲' : '🛡';
+    const label = p.type === 'magnet' ? '🧲'
+      : p.type === 'shield' ? '🛡'
+      : p.type === 'feather' ? '🪶'
+      : p.type === 'canrush' ? '🥫'
+      : '❖';
     ctx.fillText(label, 0, 0);
 
     ctx.restore();
@@ -2280,8 +3411,10 @@ function drawPowerups() {
 
 function drawActivePowerupHUD() {
   const items = [];
-  if (activePowerups.magnet > 0) items.push({ label: '🧲', timer: activePowerups.magnet, max: 6, col: '#ff6eb4' });
-  if (activePowerups.shield)     items.push({ label: '🛡', timer: 1, max: 1, col: '#4af0f0' });
+  if (activePowerups.magnet > 0)   items.push({ label: '🧲', timer: activePowerups.magnet, max: POWERUP_DURATION.magnet, col: '#ff6eb4' });
+  if (activePowerups.shield)       items.push({ label: '🛡', timer: 1, max: POWERUP_DURATION.shield, col: '#4af0f0' });
+  if (activePowerups.feather > 0)  items.push({ label: '🪶', timer: activePowerups.feather, max: POWERUP_DURATION.feather, col: '#ffd166' });
+  if (activePowerups.canrush > 0)   items.push({ label: '🥫', timer: activePowerups.canrush, max: POWERUP_DURATION.canrush, col: '#66d19e' });
 
   let ox = W / 2 - (items.length * 44) / 2;
   for (const item of items) {
@@ -2395,6 +3528,8 @@ function drawTutorial() {
 
 function drawRunSparkline() {
   if (runHistory.length < 2) return;
+  const scores = runHistory.map(runEntryScore);
+  if (scores.length < 2) return;
   const sparkW = 120, sparkH = 50;
   const sx = W / 2 - sparkW / 2;
   const sy = H * 0.82;
@@ -2408,17 +3543,17 @@ function drawRunSparkline() {
   ctx.fillStyle = 'rgba(255,255,255,0.6)';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(`Last ${runHistory.length} runs`, W / 2, sy - 4);
+  ctx.fillText(`Last ${scores.length} runs`, W / 2, sy - 4);
 
-  const minV = Math.min(...runHistory);
-  const maxV = Math.max(...runHistory);
+  const minV = Math.min(...scores);
+  const maxV = Math.max(...scores);
   const range = Math.max(1, maxV - minV);
-  const step  = sparkW / (runHistory.length - 1);
+  const step  = sparkW / (scores.length - 1);
 
   ctx.strokeStyle = '#ffc857';
   ctx.lineWidth   = 2;
   ctx.beginPath();
-  runHistory.forEach((v, i) => {
+  scores.forEach((v, i) => {
     const px = sx + i * step;
     const py = sy + sparkH - ((v - minV) / range) * sparkH;
     if (i === 0) ctx.moveTo(px, py);
@@ -2428,7 +3563,7 @@ function drawRunSparkline() {
 
   // Dots
   ctx.fillStyle = '#fff';
-  runHistory.forEach((v, i) => {
+  scores.forEach((v, i) => {
     const px = sx + i * step;
     const py = sy + sparkH - ((v - minV) / range) * sparkH;
     ctx.beginPath();
@@ -3047,6 +4182,7 @@ function checkDailyBonus() {
   lifetimeCans += bonus;
   localStorage.setItem('mochi-bird-cans', String(lifetimeCans));
   canCountEl.textContent = String(lifetimeCans);
+  scheduleCloudProfileSave();
   setTimeout(() => showToast(`🥫 Daily bonus: +${bonus} cans!`), 600);
 }
 
@@ -3063,6 +4199,7 @@ async function loadSession() {
 
   try {
     let discordUserId = null;
+    const discordUser = window.discord?.user || {};
 
     if (window.discord?.user?.id) {
       discordUserId = window.discord.user.id;
@@ -3098,16 +4235,36 @@ async function loadSession() {
             }
           } catch (err2) {
             console.log('[boot] Could not load Discord user session:', err2.message);
-            console.log('[boot] Using practice mode');
+            if (raceId && discordUserId) {
+              sessionData = {
+                userId: discordUserId,
+                userTag: discordUser.tag || discordUser.username || discordUser.global_name || 'Discord User',
+                avatarHash: discordUser.avatar ?? null,
+                channelId: '',
+                guildId: '',
+              };
+            } else {
+              console.log('[boot] Using practice mode');
+              bestScoreKey = 'mochi-bird-best-practice';
+              isPractice = true;
+              signalReady(); fetchLeaderboard(); return;
+            }
+          }
+        } else {
+          if (raceId && discordUserId) {
+            sessionData = {
+              userId: discordUserId,
+              userTag: discordUser.tag || discordUser.username || discordUser.global_name || 'Discord User',
+              avatarHash: discordUser.avatar ?? null,
+              channelId: '',
+              guildId: '',
+            };
+          } else {
+            console.log('[boot] No session found - using practice mode');
             bestScoreKey = 'mochi-bird-best-practice';
             isPractice = true;
             signalReady(); fetchLeaderboard(); return;
           }
-        } else {
-          console.log('[boot] No session found - using practice mode');
-          bestScoreKey = 'mochi-bird-best-practice';
-          isPractice = true;
-          signalReady(); fetchLeaderboard(); return;
         }
       }
     } else {
@@ -3126,7 +4283,20 @@ async function loadSession() {
       sessionData = data.session;
     }
 
+    if (raceId) {
+      const claimed = await claimRaceSession();
+      if (claimed?.session) {
+        console.log('[boot] Race session claimed:', claimed.session.id);
+      } else if (!sessionId) {
+        console.log('[boot] Could not claim race session - using practice mode');
+        bestScoreKey = 'mochi-bird-best-practice';
+        isPractice = true;
+        signalReady(); fetchLeaderboard(); return;
+      }
+    }
+
     bestScoreKey = `mochi-bird-best-${sessionData.userId}`;
+    await loadCloudProfile();
 
     try {
       const pbRes = await fetch(`/api/leaderboard/${sessionData.userId}`);
@@ -3141,7 +4311,6 @@ async function loadSession() {
       }
     } catch {}
 
-    await loadServerSkins();
     checkDailyBonus();
     refreshAnimSkins();
     console.log('[boot] Session ready');

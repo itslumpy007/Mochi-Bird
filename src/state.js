@@ -15,12 +15,27 @@ function prune() {
   }
 }
 
-export function createSession({ userId, userTag, avatarHash = null, channelId, guildId = '', baseUrl = '' }) {
+export function createSession({
+  userId,
+  userTag,
+  avatarHash = null,
+  channelId,
+  guildId = '',
+  baseUrl = '',
+  raceId = null,
+  raceTargetScore = null,
+  raceCreatorUserId = null,
+  raceCreatorUserTag = null,
+}) {
   prune();
   const id        = randomUUID();
   const createdAt = now();
   const session   = {
     id, userId, userTag, avatarHash, channelId, guildId, baseUrl,
+    raceId,
+    raceTargetScore,
+    raceCreatorUserId,
+    raceCreatorUserTag,
     createdAt,
     expiresAt:   createdAt + TTL_MS,
     status:      'active',
@@ -58,6 +73,10 @@ export function publicSession(s) {
   return {
     id: s.id, userId: s.userId, userTag: s.userTag, avatarHash: s.avatarHash ?? null,
     channelId: s.channelId, guildId: s.guildId,
+    raceId: s.raceId ?? null,
+    raceTargetScore: s.raceTargetScore ?? null,
+    raceCreatorUserId: s.raceCreatorUserId ?? null,
+    raceCreatorUserTag: s.raceCreatorUserTag ?? null,
     createdAt: s.createdAt, expiresAt: s.expiresAt,
     status: s.status, score: s.score, submittedAt: s.submittedAt,
   };
@@ -115,5 +134,11 @@ export function buildActivityUrl(baseUrl, sessionId) {
   const token = createSessionToken(sessionId);
   const url = new URL('/play', baseUrl);
   url.searchParams.set('token', token);
+  return url.toString();
+}
+
+export function buildRaceUrl(baseUrl, raceId) {
+  const url = new URL('/play', baseUrl);
+  url.searchParams.set('race', raceId);
   return url.toString();
 }

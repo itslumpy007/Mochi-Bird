@@ -11,8 +11,9 @@ import {
   Routes,
   SlashCommandBuilder,
 } from 'discord.js';
-import { buildPlayUrl, buildActivityUrl, createSession, createSessionToken } from './state.js';
-import { getLeaderboard }              from './leaderboard.js';
+import { buildPlayUrl, buildActivityUrl, buildRaceUrl, createSession, createSessionToken } from './state.js';
+import { getLeaderboard, getPersonalBest } from './leaderboard.js';
+import { createRace } from './race.js';
 
 // ── Command definitions ────────────────────────────────────────────────────────
 const COMMANDS = [
@@ -22,6 +23,9 @@ const COMMANDS = [
   new SlashCommandBuilder()
     .setName('leaderboard')
     .setDescription('Show the Mochi Bird top scores.'),
+  new SlashCommandBuilder()
+    .setName('challenge')
+    .setDescription('Create a challenge link for your current best score.'),
 ].map(c => c.toJSON());
 
 export async function registerCommands({ token, clientId, guildId }) {
@@ -96,6 +100,39 @@ export async function startBot({ token, clientId, guildId, baseUrl }) {
               .setColor(0xffc857),
           ],
         });
+        return;
+      }
+
+      if (interaction.commandName === 'challenge') {
+        const personalBest = await getPersonalBest(interaction.user.id);
+        const targetScore = Math.max(1, Number(personalBest?.bestScore || 0));
+        const race = await createRace({
+          creatorUserId: interaction.user.id,
+          creatorUserTag: interaction.user.tag,
+          creatorAvatarHash: interaction.user.avatar ?? null,
+          targetScore,
+          challengeMessage: `${interaction.user.tag} says beat ${targetScore}!`,
+        });
+        const raceUrl = buildRaceUrl(baseUrl, race.id);
+
+        const embed = new EmbedBuilder()
+          .setTitle('Mochi Bird Challenge')
+          .setDescription(`Beat **${interaction.user.tag}**'s score of **${targetScore}**.\nOpen the link below to try.`)
+          .addFields(
+            { name: 'Challenge', value: race.id.slice(0, 8) + '…', inline: true },
+            { name: 'Target', value: String(targetScore), inline: true },
+          )
+          .setColor(0xff6eb4);
+
+        const row = new ActionRowBuilder().addComponents(
+          new ButtonBuilder()
+            .setLabel('Play Challenge')
+            .setStyle(ButtonStyle.Link)
+            .setURL(raceUrl),
+        );
+
+        await interaction.reply({ flags: MessageFlags.Ephemeral, embeds: [embed], components: [row] });
+        return;
       }
     } catch (err) {
       console.error(`[bot] interaction error (/${interaction.commandName}):`, err.message);

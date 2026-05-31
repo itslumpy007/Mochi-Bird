@@ -37,10 +37,15 @@
               <span class="label">🥫 Cans</span>
               <strong id="canCount">0</strong>
             </div>
-            <span class="status" id="status">Loading…</span>
+            <div class="status-stack">
+              <span class="status" id="status">Loading…</span>
+              <span class="player-title" id="playerTitle"></span>
+              <span class="season-badge" id="seasonBadge"></span>
+              <span class="revive-badge" id="reviveBadge"></span>
+            </div>
             <div class="hud-actions">
               <button id="muteBtn"       class="ghost hud-icon-btn" type="button" title="Toggle sound">🔊</button>
-              <button id="challengesBtn" class="ghost hud-icon-btn" type="button" title="Daily Challenges">🎯</button>
+              <button id="challengesBtn" class="ghost hud-icon-btn" type="button" title="Daily Quests">🎯</button>
               <button id="statsBtn"      class="ghost hud-icon-btn" type="button" title="Stats">📊</button>
               <button id="settingsBtn"   class="ghost hud-icon-btn" type="button" title="Settings">⚙️</button>
               <button id="shopBtn"       class="ghost shop-btn"     type="button">Shop</button>
@@ -54,8 +59,11 @@
               <div class="overlay-card">
                 <h2 id="overlayTitle"></h2>
                 <p id="overlayText"></p>
+                <p id="reviveCountdown" class="revive-countdown"></p>
                 <button id="startBtn" type="button" disabled>Start</button>
+                <button id="reviveBtn" type="button" class="ghost share-btn hidden">Revive</button>
                 <button id="shareBtn" type="button" class="ghost share-btn hidden">Share 📢</button>
+                <button id="challengeBtn" type="button" class="ghost share-btn hidden">Challenge Friend</button>
               </div>
             </div>
           </div>
@@ -90,6 +98,20 @@
           <button id="storeCloseBtn" class="ghost" type="button">✕</button>
         </div>
         <p class="store-balance">Balance: <strong id="storeBalance">0</strong> cans</p>
+        <div class="season-panel">
+          <div class="season-panel-top">
+            <div>
+              <div class="run-history-title">Season Event</div>
+              <div class="season-name" id="seasonName">Loading…</div>
+            </div>
+            <div class="season-pill" id="seasonPill">Season</div>
+          </div>
+          <div class="season-copy" id="seasonCopy"></div>
+          <div class="season-progress-wrap">
+            <div class="season-progress-bar" id="seasonProgressBar"></div>
+          </div>
+          <div class="season-meta" id="seasonMeta"></div>
+        </div>
         <div class="store-filters" id="storeFilters">
           <button class="store-filter-btn active" data-filter="all">All</button>
           <button class="store-filter-btn" data-filter="owned">Owned</button>
@@ -110,10 +132,10 @@
     <div class="store-modal hidden" id="challengesModal">
       <div class="store-panel">
         <div class="store-header">
-          <h2>🎯 Daily Challenges</h2>
+          <h2>🎯 Daily Quests</h2>
           <button id="challengesCloseBtn" class="ghost" type="button">✕</button>
         </div>
-        <p class="store-balance">Complete challenges to earn bonus cans!</p>
+        <p class="store-balance">Complete quests to earn bonus cans and keep progress across devices!</p>
         <div id="challengesList" class="challenges-list"></div>
       </div>
     </div>
@@ -160,6 +182,36 @@
           <button id="statsCloseBtn" class="ghost" type="button">✕</button>
         </div>
         <div class="stats-grid" id="statsGrid"></div>
+        <div class="achievement-summary" id="reviveSummary"></div>
+        <div class="run-history-panel">
+          <div class="run-history-title">Recent Runs</div>
+          <div class="run-history-list" id="statsRuns"></div>
+        </div>
+        <div class="run-history-panel">
+          <div class="run-history-title">Achievements</div>
+          <div class="achievement-summary" id="achievementSummary"></div>
+          <div class="title-picker">
+            <div class="run-history-title">Titles</div>
+            <div class="equipped-title" id="equippedTitle"></div>
+            <div class="title-chip-list" id="titlePicker"></div>
+          </div>
+          <div class="achievement-list" id="achievementList"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Revive confirm modal -->
+    <div class="store-modal hidden" id="reviveConfirmModal">
+      <div class="store-panel revive-confirm-panel">
+        <div class="store-header">
+          <h2>Use Revive?</h2>
+          <button id="reviveCancelBtn" class="ghost" type="button">✕</button>
+        </div>
+        <p id="reviveConfirmText" class="store-balance"></p>
+        <div class="revive-confirm-actions">
+          <button id="reviveCancelBtn2" class="ghost" type="button">Cancel</button>
+          <button id="reviveConfirmBtn" type="button">Revive</button>
+        </div>
       </div>
     </div>
 

@@ -12,6 +12,14 @@ It includes:
 - Discord slash commands to launch a run
 - score submission
 - a local leaderboard
+- cloud-backed player profiles for skins, settings, and stats
+- cloud-backed daily quests and rewards
+- achievement rewards that grant cans, titles, or cosmetics
+- rotating seasonal themes and season rewards
+- async friend challenges and race links
+- server-side score plausibility checks
+- once-per-day free revives with an expensive paid fallback
+- collectable power-ups like magnet, shield, feather, and can rush
 - optional Discord Activity mode
 
 ## Quick start
@@ -68,6 +76,7 @@ Create a Discord application and bot, then set:
 - a guild ID for faster slash command updates during testing
 
 If `DISCORD_ACTIVITY_MODE=true`, `/mochi` responds with an Activity launch instead of a browser link.
+Use `/challenge` to create a shareable race link that other players can claim and try to beat asynchronously.
 
 ## Files
 
