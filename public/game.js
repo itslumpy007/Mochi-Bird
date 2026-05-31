@@ -2811,9 +2811,6 @@ function flap() {
   bird.vy = FLAP_VEL;
   sfx.flap();
   if (navigator.vibrate) navigator.vibrate(12);
-  if (animSkinList.length > 1) {
-    animFrame = (animFrame + 1) % animSkinList.length;
-  }
 }
 
 window.addEventListener('keydown', (e) => {
@@ -3194,7 +3191,7 @@ function drawBird(overrideY, overrideTilt) {
     ctx.globalAlpha = 1;
   }
 
-  const displaySkin = (animSkinList.length > 1) ? animSkinList[animFrame] : currentSkin;
+  const displaySkin = currentSkin;
   const clipR   = bird.r * 2.3;
   const displayH = bird.r * 5.2;
 
@@ -3697,7 +3694,7 @@ function drawMainMenu() {
   drawHeart(titleCX + fs2 * 1.05, titleCY + fs2 * 0.55, 5, '#ff6eb4');
 
   // ── Bird portrait (between title and buttons) ─────────────────
-  const birdImg = (animSkinList.length > 1 ? animSkinList[animFrame] : currentSkin)?.img
+  const birdImg = currentSkin?.img
                   || currentSkin.img;
   const birdCR  = clamp(W * 0.085, 26, 38); // portrait circle radius
   const birdCX  = W / 2;
@@ -3721,7 +3718,7 @@ function drawMainMenu() {
     ctx.beginPath();
     ctx.arc(birdCX, birdCY, birdCR, 0, Math.PI * 2);
     ctx.clip();
-    drawSkinImage(ctx, animSkinList.length > 1 ? animSkinList[animFrame] : currentSkin, birdCX - dw / 2, birdCY - dh * 0.48, dw, dh);
+    drawSkinImage(ctx, currentSkin, birdCX - dw / 2, birdCY - dh * 0.48, dw, dh);
     ctx.restore();
   }
 
