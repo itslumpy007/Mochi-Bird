@@ -48,10 +48,9 @@ const CAN_R         = 9;
 const HIT_R         = 10;    // collision radius (smaller than visual for fair play)
 
 // Difficulty helpers
-let slowMult = 1;
 let difficulty = localStorage.getItem('mochi-bird-difficulty') || 'normal';
 function diffMult() { return difficulty === 'easy' ? 0.7 : difficulty === 'hard' ? 1.35 : 1.0; }
-function curPipeSpeed() { return (PIPE_SPEED + Math.min(score * 2.5, 110)) * slowMult * diffMult(); }
+function curPipeSpeed() { return (PIPE_SPEED + Math.min(score * 2.5, 110)) * diffMult(); }
 function curPipeGap()   { return Math.max(118, (PIPE_GAP - score * 1.8) / diffMult()); }
 
 // ── Skins ──────────────────────────────────────────────────────────────────────
@@ -292,7 +291,7 @@ function getCanMult() {
 
 // ── Power-ups ─────────────────────────────────────────────────────────────────
 let powerups = [];
-let activePowerups = { magnet: 0, shield: false, slow: 0 };
+let activePowerups = { magnet: 0, shield: false };
 let shieldFlash = 0; // timer for white flash effect
 
 // ── Pause ─────────────────────────────────────────────────────────────────────
@@ -867,8 +866,7 @@ function resetGame() {
   combo            = 0;
   maxCombo         = 0;
   powerups         = [];
-  activePowerups   = { magnet: 0, shield: false, slow: 0 };
-  slowMult         = 1;
+  activePowerups   = { magnet: 0, shield: false };
   shieldFlash      = 0;
   paused           = false;
   dyingTimer       = 0;
@@ -890,7 +888,7 @@ function addPipe() {
   spawnCans(topH, gap);
   // 15% chance to spawn a power-up in the gap
   if (Math.random() < 0.15) {
-    const types = ['magnet', 'shield', 'slow'];
+    const types = ['magnet', 'shield'];
     const type  = types[Math.floor(Math.random() * types.length)];
     const gapCenter = topH + gap / 2;
     powerups.push({ x: W + 30 + PIPE_W / 2, y: gapCenter, type, collected: false });
@@ -1063,17 +1061,6 @@ function update(dt) {
   if (activePowerups.magnet > 0) {
     activePowerups.magnet -= dt;
     if (activePowerups.magnet < 0) activePowerups.magnet = 0;
-  }
-  if (activePowerups.slow > 0) {
-    activePowerups.slow -= dt;
-    if (activePowerups.slow <= 0) {
-      activePowerups.slow = 0;
-      slowMult = 1;
-    } else {
-      slowMult = 0.6;
-    }
-  } else {
-    slowMult = 1;
   }
   if (shieldFlash > 0) shieldFlash -= dt;
 
@@ -1280,9 +1267,6 @@ function update(dt) {
       } else if (p.type === 'shield') {
         activePowerups.shield = true;
         showToast('🛡️ Shield activated!');
-      } else if (p.type === 'slow') {
-        activePowerups.slow = 5;
-        showToast('🐌 Slow-mo activated! (5s)');
       }
       if (particlesEnabled) spawnParticles(p.x, p.y, { count: 8, colors: ['#fff', '#ffc857'], speed: 70, life: 0.5 });
     }
@@ -2269,7 +2253,7 @@ function drawPowerups() {
     ctx.font        = '11px sans-serif';
     ctx.textAlign   = 'center';
     ctx.textBaseline = 'middle';
-    const label = p.type === 'magnet' ? '🧲' : p.type === 'shield' ? '🛡' : '🐌';
+    const label = p.type === 'magnet' ? '🧲' : '🛡';
     ctx.fillText(label, 0, 0);
 
     ctx.restore();
@@ -2280,7 +2264,6 @@ function drawActivePowerupHUD() {
   const items = [];
   if (activePowerups.magnet > 0) items.push({ label: '🧲', timer: activePowerups.magnet, max: 6, col: '#ff6eb4' });
   if (activePowerups.shield)     items.push({ label: '🛡', timer: 1, max: 1, col: '#4af0f0' });
-  if (activePowerups.slow > 0)   items.push({ label: '🐌', timer: activePowerups.slow, max: 5, col: '#c47aff' });
 
   let ox = W / 2 - (items.length * 44) / 2;
   for (const item of items) {
